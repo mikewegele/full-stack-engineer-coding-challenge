@@ -28,7 +28,10 @@ export class PricingCatalogsController {
   @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
   @ApiOperation({ summary: 'List pricing catalog versions' })
   @ApiResponse({ status: 200, description: 'Pricing catalog versions, newest first' })
-  list(@Query() query: QueryPricingCatalogsDto, @CurrentUser() user: JwtPayload) {
+  list(
+    @Query() query: QueryPricingCatalogsDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PricingCatalogResponseDto[]> {
     return this.service.list(query, user);
   }
 
@@ -49,7 +52,10 @@ export class PricingCatalogsController {
   @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
   @ApiOperation({ summary: 'Create a draft pricing catalog version' })
   @ApiResponse({ status: 201, type: PricingCatalogResponseDto })
-  @ApiResponse({ status: 403, description: 'Caller may not create a catalog for this craftsman' })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller may not create a catalog for this craftsman',
+  })
   @ApiResponse({ status: 404, description: 'Craftsman not found' })
   create(
     @Body() dto: CreatePricingCatalogDto,
