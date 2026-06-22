@@ -1,4 +1,13 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '@sandbox/auth';
 import { JwtPayload, UserRole } from '@sandbox/types';
@@ -6,6 +15,7 @@ import { JwtPayload, UserRole } from '@sandbox/types';
 import { QueryPricingCatalogsDto } from './dto/query-pricing-catalogs.dto';
 import { PricingCatalogsService } from './pricing-catalogs.service';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
+import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 
 @ApiTags('Pricing Catalogs')
 @ApiBearerAuth()
@@ -33,5 +43,18 @@ export class PricingCatalogsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<PricingCatalogResponseDto> {
     return this.service.findOne(versionId, user);
+  }
+
+  @Post()
+  @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
+  @ApiOperation({ summary: 'Create a draft pricing catalog version' })
+  @ApiResponse({ status: 201, type: PricingCatalogResponseDto })
+  @ApiResponse({ status: 403, description: 'Caller may not create a catalog for this craftsman' })
+  @ApiResponse({ status: 404, description: 'Craftsman not found' })
+  create(
+    @Body() dto: CreatePricingCatalogDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PricingCatalogResponseDto> {
+    return this.service.create(dto, user);
   }
 }

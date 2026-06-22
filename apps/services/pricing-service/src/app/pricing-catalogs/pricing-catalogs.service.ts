@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { Repository } from 'typeorm';
@@ -6,12 +11,20 @@ import { Repository } from 'typeorm';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
 import { QueryPricingCatalogsDto } from './dto/query-pricing-catalogs.dto';
 import { PricingCatalogVersion } from './entities/pricing-catalog-version.entity';
+import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
+import { Craftsman } from '../craftsmen/entities/craftsman.entity';
+import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
+import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
 
 @Injectable()
 export class PricingCatalogsService {
   constructor(
     @InjectRepository(PricingCatalogVersion)
     private readonly versions: Repository<PricingCatalogVersion>,
+    @InjectRepository(Craftsman)
+    private readonly craftsmen: Repository<Craftsman>,
+    @InjectRepository(CraftsmanTradeAssignment)
+    private readonly assignments: Repository<CraftsmanTradeAssignment>,
   ) {}
 
   async list(
@@ -73,6 +86,59 @@ export class PricingCatalogsService {
     this.assertCanAccess(version.craftsmanId, user);
     return PricingCatalogResponseDto.from(version);
   }
+
+  async create(dto: CreatePricingCatalogDto, user: JwtPayload): Promise<PricingCatalogResponseDto> {
+    this.assertCanAccess(dto.craftsmanId, user);
+
+    const craftsman = await this.craftsmen.findOne({
+      where: { id: dto.craftsmanId },
+    });
+
+    if (!craftsman) {
+      throw new NotFoundException(`Craftsman ${dto.craftsmanId} not found`);
+    }
+
+    if (!craftsman.isActive) {
+      throw new BadRequestException(`Craftsman ${dto.craftsmanId} is inactive`);
+    }
+
+    const assignment = await this.assignments.findOne({
+      where: {
+        craftsmanId: dto.craftsmanId,
+        trade: dto.trade,
+        isActive: true,
+      },
+    });
+
+    if (!assignment) {
+      throw new BadRequestException(
+        `Craftsman ${dto.craftsmanId} is not assigned to trade ${dto.trade}`,
+      );
+    }
+
+    const version = this.versions.create({
+      craftsmanId: dto.craftsmanId,
+      trade: dto.trade,
+      status: PricingCatalogStatus.DRAFT,
+      effectiveFrom: new Date(dto.effectiveFrom),
+      publishedByUserId: null,
+      publishedAt: null,
+      positions: [],
+      discounts: [],
+    });
+
+    const saved = await this.versions.save(version);
+
+    return PricingCatalogResponseDto.from({
+      ...saved,
+      positions: [],
+      discounts: [],
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Private helper methods
+  // ---------------------------------------------------------------------
 
   private isCraftsmanOnly(user: JwtPayload): boolean {
     return user.roles.includes(UserRole.CRAFTSMAN) && !user.roles.includes(UserRole.ADMIN);

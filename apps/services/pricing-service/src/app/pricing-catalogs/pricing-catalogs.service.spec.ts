@@ -1,7 +1,9 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { ObjectLiteral, Repository } from 'typeorm';
 
+import { Craftsman } from '../craftsmen/entities/craftsman.entity';
+import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
 import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
 import { PricingCatalogVersion } from './entities/pricing-catalog-version.entity';
@@ -47,9 +49,47 @@ function buildVersion(overrides: Partial<PricingCatalogVersion> = {}): PricingCa
   } as PricingCatalogVersion;
 }
 
+function buildCraftsman(overrides: Partial<Craftsman> = {}): Craftsman {
+  const now = new Date('2026-01-01T00:00:00.000Z');
+
+  return {
+    id: 'craftsman-a',
+    companyName: 'Test GmbH',
+    email: null,
+    phone: null,
+    vatNumber: null,
+    addressLine1: null,
+    addressLine2: null,
+    postalCode: null,
+    city: null,
+    country: 'Germany',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    tradeAssignments: [],
+    ...overrides,
+  } as Craftsman;
+}
+
+function buildAssignment(
+  overrides: Partial<CraftsmanTradeAssignment> = {},
+): CraftsmanTradeAssignment {
+  return {
+    id: 'assignment-id',
+    craftsmanId: 'craftsman-a',
+    trade: 'HVAC',
+    isActive: true,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    craftsman: buildCraftsman(),
+    ...overrides,
+  } as CraftsmanTradeAssignment;
+}
+
 describe('PricingCatalogsService', () => {
   let service: PricingCatalogsService;
   let repo: Repo<PricingCatalogVersion>;
+  let craftsmen: Repo<Craftsman>;
+  let assignments: Repo<CraftsmanTradeAssignment>;
   let qb: { [key: string]: jest.Mock };
 
   beforeEach(() => {
@@ -64,9 +104,30 @@ describe('PricingCatalogsService', () => {
     repo = {
       createQueryBuilder: jest.fn().mockReturnValue(qb),
       findOne: jest.fn(),
+      create: jest.fn().mockImplementation((x: Partial<PricingCatalogVersion>) => x),
+      save: jest.fn().mockImplementation((x: PricingCatalogVersion) =>
+        Promise.resolve({
+          ...x,
+          id: x.id ?? 'version-id',
+          createdAt: x.createdAt ?? new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: x.updatedAt ?? new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      ),
     };
 
-    service = new PricingCatalogsService(repo as unknown as Repository<PricingCatalogVersion>);
+    craftsmen = {
+      findOne: jest.fn(),
+    };
+
+    assignments = {
+      findOne: jest.fn(),
+    };
+
+    service = new PricingCatalogsService(
+      repo as unknown as Repository<PricingCatalogVersion>,
+      craftsmen as unknown as Repository<Craftsman>,
+      assignments as unknown as Repository<CraftsmanTradeAssignment>,
+    );
   });
 
   describe('list', () => {
@@ -138,6 +199,111 @@ describe('PricingCatalogsService', () => {
       const result = await service.findOne('version-id', craftsmanUser);
 
       expect(result.id).toBe('version-id');
+    });
+  });
+
+  describe('create', () => {
+    it('creates a draft pricing catalog for admin', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(buildAssignment());
+
+      const result = await service.create(
+        {
+          craftsmanId: 'craftsman-a',
+          trade: 'HVAC',
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+        },
+        adminUser,
+      );
+
+      expect(result.status).toBe(PricingCatalogStatus.DRAFT);
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          craftsmanId: 'craftsman-a',
+          trade: 'HVAC',
+          status: PricingCatalogStatus.DRAFT,
+          publishedByUserId: null,
+          publishedAt: null,
+          positions: [],
+          discounts: [],
+        }),
+      );
+      expect(repo.save).toHaveBeenCalled();
+    });
+
+    it('allows CRAFTSMAN to create a draft for their own craftsmanId', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(buildAssignment());
+
+      const result = await service.create(
+        {
+          craftsmanId: 'craftsman-a',
+          trade: 'HVAC',
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+        },
+        craftsmanUser,
+      );
+
+      expect(result.craftsmanId).toBe('craftsman-a');
+    });
+
+    it('throws ForbiddenException when CRAFTSMAN creates for another craftsmanId', async () => {
+      await expect(
+        service.create(
+          {
+            craftsmanId: 'craftsman-a',
+            trade: 'HVAC',
+            effectiveFrom: '2026-01-01T00:00:00.000Z',
+          },
+          otherCraftsmanUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws NotFoundException when craftsman does not exist', async () => {
+      craftsmen.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.create(
+          {
+            craftsmanId: 'craftsman-a',
+            trade: 'HVAC',
+            effectiveFrom: '2026-01-01T00:00:00.000Z',
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException when craftsman is inactive', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman({ isActive: false }));
+
+      await expect(
+        service.create(
+          {
+            craftsmanId: 'craftsman-a',
+            trade: 'HVAC',
+            effectiveFrom: '2026-01-01T00:00:00.000Z',
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when craftsman is not assigned to the trade', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.create(
+          {
+            craftsmanId: 'craftsman-a',
+            trade: 'HVAC',
+            effectiveFrom: '2026-01-01T00:00:00.000Z',
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });
