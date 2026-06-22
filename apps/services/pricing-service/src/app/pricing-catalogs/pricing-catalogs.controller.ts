@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import { QueryPricingCatalogsDto } from './dto/query-pricing-catalogs.dto';
 import { PricingCatalogsService } from './pricing-catalogs.service';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
 import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
+import { UpdatePricingCatalogDto } from './dto/update-pricing-catalog.dto';
 
 @ApiTags('Pricing Catalogs')
 @ApiBearerAuth()
@@ -62,5 +64,20 @@ export class PricingCatalogsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<PricingCatalogResponseDto> {
     return this.service.create(dto, user);
+  }
+
+  @Patch(':versionId')
+  @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
+  @ApiOperation({ summary: 'Update a draft pricing catalog version' })
+  @ApiResponse({ status: 200, type: PricingCatalogResponseDto })
+  @ApiResponse({ status: 400, description: 'Pricing catalog attributes are invalid' })
+  @ApiResponse({ status: 403, description: 'Caller may not update this pricing catalog' })
+  @ApiResponse({ status: 404, description: 'Pricing catalog version not found' })
+  update(
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() dto: UpdatePricingCatalogDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PricingCatalogResponseDto> {
+    return this.service.updateDraft(versionId, dto, user);
   }
 }

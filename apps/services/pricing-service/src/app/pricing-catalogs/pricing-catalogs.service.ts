@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { Repository } from 'typeorm';
@@ -15,6 +10,13 @@ import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
+import { UpdatePricingCatalogDto, UpdatePricingCatalogPositionDto, } from './dto/update-pricing-catalog.dto';
+import { PricingCatalogPosition } from './entities/pricing-catalog-position.entity';
+import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
+import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
+import { TradeConfig } from '../trades/entities/trade-config.entity';
+import { PricingSchema } from './schema/pricing-schema.types';
+import { validatePricingAttributes } from './schema/pricing-schema.validator';
 
 @Injectable()
 export class PricingCatalogsService {
@@ -25,6 +27,14 @@ export class PricingCatalogsService {
     private readonly craftsmen: Repository<Craftsman>,
     @InjectRepository(CraftsmanTradeAssignment)
     private readonly assignments: Repository<CraftsmanTradeAssignment>,
+    @InjectRepository(PricingCatalogPosition)
+    private readonly positions: Repository<PricingCatalogPosition>,
+    @InjectRepository(PricingCatalogSurcharge)
+    private readonly surcharges: Repository<PricingCatalogSurcharge>,
+    @InjectRepository(PricingCatalogDiscount)
+    private readonly discounts: Repository<PricingCatalogDiscount>,
+    @InjectRepository(TradeConfig)
+    private readonly tradeConfigs: Repository<TradeConfig>,
   ) {}
 
   async list(
@@ -42,7 +52,6 @@ export class PricingCatalogsService {
         craftsmanId: query.craftsmanId,
       });
     }
-
     if (query.trade) {
       qb.andWhere('version.trade = :trade', { trade: query.trade });
     }
@@ -97,7 +106,6 @@ export class PricingCatalogsService {
     if (!craftsman) {
       throw new NotFoundException(`Craftsman ${dto.craftsmanId} not found`);
     }
-
     if (!craftsman.isActive) {
       throw new BadRequestException(`Craftsman ${dto.craftsmanId} is inactive`);
     }
@@ -136,9 +144,112 @@ export class PricingCatalogsService {
     });
   }
 
+  async updateDraft(
+    versionId: string,
+    dto: UpdatePricingCatalogDto,
+    user: JwtPayload,
+  ): Promise<PricingCatalogResponseDto> {
+    const existing = await this.versions.findOne({
+      where: { id: versionId },
+      relations: {
+        positions: {
+          surcharges: true,
+        },
+        discounts: true,
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Pricing catalog ${versionId} not found`);
+    }
+    this.assertCanAccess(existing.craftsmanId, user);
+    if (existing.status !== PricingCatalogStatus.DRAFT) {
+      throw new BadRequestException('Only draft pricing catalogs can be updated');
+    }
+    if (dto.positions !== undefined) {
+      await this.validatePositionAttributes(existing.trade, dto.positions);
+    }
+
+    Object.assign(existing, {
+      ...(dto.effectiveFrom !== undefined && {
+        effectiveFrom: new Date(dto.effectiveFrom),
+      }),
+      ...(dto.positions !== undefined && {
+        positions: dto.positions.map((positionDto) =>
+          this.positions.create({
+            key: positionDto.key,
+            label: positionDto.label,
+            unit: positionDto.unit,
+            netPriceCents: positionDto.netPriceCents,
+            vatRate: String(positionDto.vatRate),
+            minQuantity:
+              positionDto.minQuantity !== undefined ? String(positionDto.minQuantity) : null,
+            maxQuantity:
+              positionDto.maxQuantity !== undefined ? String(positionDto.maxQuantity) : null,
+            attributes: positionDto.attributes ?? {},
+            surcharges: (positionDto.surcharges ?? []).map((surchargeDto) =>
+              this.surcharges.create({
+                key: surchargeDto.key,
+                label: surchargeDto.label,
+                type: surchargeDto.type,
+                amountCents: surchargeDto.amountCents ?? null,
+                percentage:
+                  surchargeDto.percentage !== undefined ? String(surchargeDto.percentage) : null,
+              }),
+            ),
+          }),
+        ),
+      }),
+      ...(dto.discounts !== undefined && {
+        discounts: dto.discounts.map((discountDto) =>
+          this.discounts.create({
+            key: discountDto.key,
+            label: discountDto.label,
+            type: discountDto.type,
+            amountCents: discountDto.amountCents ?? null,
+            percentage:
+              discountDto.percentage !== undefined ? String(discountDto.percentage) : null,
+            capCents: discountDto.capCents ?? null,
+            appliesTo: discountDto.appliesTo,
+            sortOrder: discountDto.sortOrder ?? 0,
+          }),
+        ),
+      }),
+    });
+
+    const saved = await this.versions.save(existing);
+    return PricingCatalogResponseDto.from(saved);
+  }
+
   // ---------------------------------------------------------------------
   // Private helper methods
   // ---------------------------------------------------------------------
+
+  private async validatePositionAttributes(
+    trade: string,
+    positions: UpdatePricingCatalogPositionDto[],
+  ): Promise<void> {
+    const tradeConfig = await this.tradeConfigs.findOne({
+      where: { trade },
+    });
+
+    if (!tradeConfig) {
+      throw new BadRequestException(`Trade config for ${trade} not found`);
+    }
+
+    positions.forEach((position) => {
+      const validationErrors = validatePricingAttributes(
+        tradeConfig.pricingSchema as PricingSchema,
+        position.attributes ?? {},
+      );
+
+      if (validationErrors.length > 0) {
+        throw new BadRequestException({
+          message: `Attributes for position ${position.key} are invalid`,
+          errors: validationErrors,
+        });
+      }
+    });
+  }
 
   private isCraftsmanOnly(user: JwtPayload): boolean {
     return user.roles.includes(UserRole.CRAFTSMAN) && !user.roles.includes(UserRole.ADMIN);

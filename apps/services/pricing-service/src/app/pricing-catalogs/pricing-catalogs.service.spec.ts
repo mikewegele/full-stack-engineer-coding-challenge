@@ -5,9 +5,17 @@ import { ObjectLiteral, Repository } from 'typeorm';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
-import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
+import {
+  PricingAdjustmentType,
+  PricingCatalogStatus,
+  PricingUnit,
+} from './entities/pricing-catalog.enums';
 import { PricingCatalogVersion } from './entities/pricing-catalog-version.entity';
 import { PricingCatalogsService } from './pricing-catalogs.service';
+import { PricingCatalogPosition } from './entities/pricing-catalog-position.entity';
+import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
+import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
+import { TradeConfig } from '../trades/entities/trade-config.entity';
 
 type Repo<T extends ObjectLiteral> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -85,11 +93,31 @@ function buildAssignment(
   } as CraftsmanTradeAssignment;
 }
 
+function buildTradeConfig(overrides: Partial<TradeConfig> = {}): TradeConfig {
+  const now = new Date('2026-01-01T00:00:00.000Z');
+
+  return {
+    id: 'trade-config-id',
+    trade: 'HVAC',
+    displayName: 'Heating',
+    isActive: true,
+    pricingSchema: { fields: [] },
+    metadata: {},
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  } as TradeConfig;
+}
+
 describe('PricingCatalogsService', () => {
   let service: PricingCatalogsService;
   let repo: Repo<PricingCatalogVersion>;
   let craftsmen: Repo<Craftsman>;
   let assignments: Repo<CraftsmanTradeAssignment>;
+  let positions: Repo<PricingCatalogPosition>;
+  let surcharges: Repo<PricingCatalogSurcharge>;
+  let discounts: Repo<PricingCatalogDiscount>;
+  let tradeConfigs: Repo<TradeConfig>;
   let qb: { [key: string]: jest.Mock };
 
   beforeEach(() => {
@@ -123,10 +151,44 @@ describe('PricingCatalogsService', () => {
       findOne: jest.fn(),
     };
 
+    positions = {
+      create: jest.fn().mockImplementation((x: Partial<PricingCatalogPosition>) => x),
+    };
+
+    surcharges = {
+      create: jest.fn().mockImplementation((x: Partial<PricingCatalogSurcharge>) => x),
+    };
+
+    discounts = {
+      create: jest.fn().mockImplementation((x: Partial<PricingCatalogDiscount>) => x),
+    };
+
+    tradeConfigs = {
+      findOne: jest.fn().mockResolvedValue(
+        buildTradeConfig({
+          pricingSchema: {
+            fields: [
+              {
+                name: 'heatingPowerKw',
+                type: 'number',
+                required: true,
+                min: 3,
+                max: 20,
+              },
+            ],
+          },
+        }),
+      ),
+    };
+
     service = new PricingCatalogsService(
       repo as unknown as Repository<PricingCatalogVersion>,
       craftsmen as unknown as Repository<Craftsman>,
       assignments as unknown as Repository<CraftsmanTradeAssignment>,
+      positions as unknown as Repository<PricingCatalogPosition>,
+      surcharges as unknown as Repository<PricingCatalogSurcharge>,
+      discounts as unknown as Repository<PricingCatalogDiscount>,
+      tradeConfigs as unknown as Repository<TradeConfig>,
     );
   });
 
@@ -304,6 +366,259 @@ describe('PricingCatalogsService', () => {
           adminUser,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('updateDraft', () => {
+    it('updates a draft pricing catalog', async () => {
+      repo.findOne!.mockResolvedValue(buildVersion());
+
+      const result = await service.updateDraft(
+        'version-id',
+        {
+          effectiveFrom: '2026-02-01T00:00:00.000Z',
+          positions: [
+            {
+              key: 'heat-pump-installation',
+              label: 'Heat pump installation',
+              unit: PricingUnit.PIECE,
+              netPriceCents: 120000,
+              vatRate: 0.19,
+              minQuantity: 1,
+              maxQuantity: 2,
+              attributes: {
+                heatingPowerKw: 12,
+              },
+              surcharges: [
+                {
+                  key: 'express',
+                  label: 'Express',
+                  type: PricingAdjustmentType.FLAT,
+                  amountCents: 5000,
+                },
+              ],
+            },
+          ],
+          discounts: [
+            {
+              key: 'winter-discount',
+              label: 'Winter discount',
+              type: PricingAdjustmentType.PERCENTAGE,
+              percentage: 0.1,
+              capCents: 20000,
+              appliesTo: 'subtotal',
+              sortOrder: 1,
+            },
+          ],
+        },
+        adminUser,
+      );
+
+      expect(result.id).toBe('version-id');
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          effectiveFrom: new Date('2026-02-01T00:00:00.000Z'),
+          positions: [
+            expect.objectContaining({
+              key: 'heat-pump-installation',
+              label: 'Heat pump installation',
+              unit: PricingUnit.PIECE,
+              netPriceCents: 120000,
+              vatRate: '0.19',
+              minQuantity: '1',
+              maxQuantity: '2',
+              attributes: {
+                heatingPowerKw: 12,
+              },
+              surcharges: [
+                expect.objectContaining({
+                  key: 'express',
+                  label: 'Express',
+                  type: PricingAdjustmentType.FLAT,
+                  amountCents: 5000,
+                  percentage: null,
+                }),
+              ],
+            }),
+          ],
+          discounts: [
+            expect.objectContaining({
+              key: 'winter-discount',
+              label: 'Winter discount',
+              type: PricingAdjustmentType.PERCENTAGE,
+              amountCents: null,
+              percentage: '0.1',
+              capCents: 20000,
+              appliesTo: 'subtotal',
+              sortOrder: 1,
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('allows CRAFTSMAN to update their own draft', async () => {
+      repo.findOne!.mockResolvedValue(buildVersion());
+
+      const result = await service.updateDraft(
+        'version-id',
+        {
+          effectiveFrom: '2026-02-01T00:00:00.000Z',
+        },
+        craftsmanUser,
+      );
+
+      expect(result.id).toBe('version-id');
+      expect(repo.save).toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when version does not exist', async () => {
+      repo.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.updateDraft(
+          'missing-id',
+          {
+            effectiveFrom: '2026-02-01T00:00:00.000Z',
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws ForbiddenException when CRAFTSMAN updates another catalog', async () => {
+      repo.findOne!.mockResolvedValue(buildVersion());
+
+      await expect(
+        service.updateDraft(
+          'version-id',
+          {
+            effectiveFrom: '2026-02-01T00:00:00.000Z',
+          },
+          otherCraftsmanUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws BadRequestException when updating a published catalog', async () => {
+      repo.findOne!.mockResolvedValue(
+        buildVersion({
+          status: PricingCatalogStatus.PUBLISHED,
+          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+          publishedByUserId: 'admin-id',
+        }),
+      );
+
+      await expect(
+        service.updateDraft(
+          'version-id',
+          {
+            effectiveFrom: '2026-02-01T00:00:00.000Z',
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when position attributes do not match the pricing schema', async () => {
+      repo.findOne!.mockResolvedValue(buildVersion());
+
+      tradeConfigs.findOne!.mockResolvedValue(
+        buildTradeConfig({
+          pricingSchema: {
+            fields: [
+              {
+                name: 'heatingPowerKw',
+                type: 'number',
+                required: true,
+                min: 3,
+                max: 20,
+              },
+            ],
+          },
+        }),
+      );
+
+      await expect(
+        service.updateDraft(
+          'version-id',
+          {
+            positions: [
+              {
+                key: 'heat-pump-installation',
+                label: 'Heat pump installation',
+                unit: PricingUnit.PIECE,
+                netPriceCents: 120000,
+                vatRate: 0.19,
+                attributes: {
+                  heatingPowerKw: 30,
+                },
+              },
+            ],
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('keeps existing positions and discounts when they are omitted', async () => {
+      const existing = buildVersion();
+
+      const existingPosition = {
+        id: 'position-id',
+        versionId: 'version-id',
+        version: existing,
+        key: 'existing-position',
+        label: 'Existing position',
+        unit: PricingUnit.PIECE,
+        netPriceCents: 10000,
+        vatRate: '0.19',
+        minQuantity: null,
+        maxQuantity: null,
+        attributes: {},
+        surcharges: [],
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      } as PricingCatalogPosition;
+
+      const existingDiscount = {
+        id: 'discount-id',
+        versionId: 'version-id',
+        version: existing,
+        key: 'existing-discount',
+        label: 'Existing discount',
+        type: PricingAdjustmentType.FLAT,
+        amountCents: 1000,
+        percentage: null,
+        capCents: null,
+        appliesTo: 'subtotal',
+        sortOrder: 0,
+      } as PricingCatalogDiscount;
+
+      existing.positions = [existingPosition];
+      existing.discounts = [existingDiscount];
+
+      repo.findOne!.mockResolvedValue(existing);
+
+      await service.updateDraft(
+        'version-id',
+        {
+          effectiveFrom: '2026-02-01T00:00:00.000Z',
+        },
+        adminUser,
+      );
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positions: existing.positions,
+          discounts: existing.discounts,
+        }),
+      );
     });
   });
 });
