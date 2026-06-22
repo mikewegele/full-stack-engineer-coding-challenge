@@ -1,11 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  OneToMany,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, } from 'typeorm';
 
 import { PricingCatalogStatus } from './pricing-catalog.enums';
 import { PricingCatalogPosition } from './pricing-catalog-position.entity';
@@ -13,29 +6,30 @@ import { PricingCatalogDiscount } from './pricing-catalog-discount.entity';
 
 @Entity({ schema: 'pricing_service', name: 'pricing_catalog_versions' })
 export class PricingCatalogVersion {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id!: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'craftsman_id', type: 'uuid' })
   craftsmanId!: string;
 
-  @Column({ type: 'varchar', length: 64 })
+  @Column({ name: 'trade', type: 'varchar', length: 64 })
   trade!: string;
 
   @Column({
+    name: 'status',
     type: 'enum',
     enum: PricingCatalogStatus,
     default: PricingCatalogStatus.DRAFT,
   })
   status!: PricingCatalogStatus;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ name: 'effective_form', type: 'timestamptz' })
   effectiveFrom!: Date;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'published_by_user_id', type: 'uuid', nullable: true })
   publishedByUserId!: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'published_at', type: 'timestamptz', nullable: true })
   publishedAt!: Date | null;
 
   @OneToMany(() => PricingCatalogPosition, (position) => position.version, {
@@ -48,9 +42,9 @@ export class PricingCatalogVersion {
   })
   discounts!: PricingCatalogDiscount[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

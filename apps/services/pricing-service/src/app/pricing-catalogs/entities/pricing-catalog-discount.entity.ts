@@ -8,10 +8,10 @@ export type DiscountAppliesTo = 'subtotal' | { positionKeys: string[] };
 @Entity({ schema: 'pricing_service', name: 'pricing_catalog_discounts' })
 @Index(['versionId', 'key'], { unique: true })
 export class PricingCatalogDiscount {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id!: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'version_id', type: 'uuid' })
   versionId!: string;
 
   @ManyToOne(() => PricingCatalogVersion, (version) => version.discounts, {
@@ -19,27 +19,27 @@ export class PricingCatalogDiscount {
   })
   version!: PricingCatalogVersion;
 
-  @Column({ type: 'varchar', length: 128 })
+  @Column({ name: 'key', type: 'varchar', length: 128 })
   key!: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ name: 'label', type: 'varchar', length: 255 })
   label!: string;
 
-  @Column({ type: 'enum', enum: PricingAdjustmentType })
+  @Column({ name: 'type', type: 'enum', enum: PricingAdjustmentType })
   type!: PricingAdjustmentType;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ name: 'amount_cents', type: 'integer', nullable: true })
   amountCents!: number | null;
 
-  @Column({ type: 'numeric', precision: 8, scale: 4, nullable: true })
+  @Column({ name: 'percentage', type: 'numeric', precision: 8, scale: 4, nullable: true })
   percentage!: string | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ name: 'cap_cents', type: 'integer', nullable: true })
   capCents!: number | null;
 
-  @Column({ type: 'jsonb' })
+  @Column({ name: 'applies_to', type: 'jsonb' })
   appliesTo!: DiscountAppliesTo;
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ name: 'sort_order', type: 'integer', default: 0 })
   sortOrder!: number;
 }

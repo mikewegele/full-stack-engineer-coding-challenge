@@ -16,10 +16,10 @@ import { PricingCatalogSurcharge } from './pricing-catalog-surcharge.entity';
 @Entity({ schema: 'pricing_service', name: 'pricing_catalog_positions' })
 @Index(['versionId', 'key'], { unique: true })
 export class PricingCatalogPosition {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id!: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'version_id', type: 'uuid' })
   versionId!: string;
 
   @ManyToOne(() => PricingCatalogVersion, (version) => version.positions, {
@@ -27,28 +27,28 @@ export class PricingCatalogPosition {
   })
   version!: PricingCatalogVersion;
 
-  @Column({ type: 'varchar', length: 128 })
+  @Column({ name: 'key', type: 'varchar', length: 128 })
   key!: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ name: 'label', type: 'varchar', length: 255 })
   label!: string;
 
-  @Column({ type: 'enum', enum: PricingUnit })
+  @Column({ name: 'unit', type: 'enum', enum: PricingUnit })
   unit!: PricingUnit;
 
-  @Column({ type: 'integer' })
+  @Column({ name: 'net_price_cents', type: 'integer' })
   netPriceCents!: number;
 
-  @Column({ type: 'numeric', precision: 5, scale: 4 })
+  @Column({ name: 'vat_rate', type: 'numeric', precision: 5, scale: 4 })
   vatRate!: string;
 
-  @Column({ type: 'numeric', precision: 12, scale: 3, nullable: true })
+  @Column({ name: 'min_quantity', type: 'numeric', precision: 12, scale: 3, nullable: true })
   minQuantity!: string | null;
 
-  @Column({ type: 'numeric', precision: 12, scale: 3, nullable: true })
+  @Column({ name: 'max_quantity', type: 'numeric', precision: 12, scale: 3, nullable: true })
   maxQuantity!: string | null;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ name: 'attributes', type: 'jsonb', default: {} })
   attributes!: Record<string, unknown>;
 
   @OneToMany(() => PricingCatalogSurcharge, (surcharge) => surcharge.position, {
@@ -56,9 +56,9 @@ export class PricingCatalogPosition {
   })
   surcharges!: PricingCatalogSurcharge[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

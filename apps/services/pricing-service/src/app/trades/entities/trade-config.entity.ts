@@ -1,11 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn, } from 'typeorm';
 
 /**
  * Configuration per trade category. Holds the human-readable label plus any
@@ -33,6 +26,12 @@ export class TradeConfig {
    */
   @Column({ type: 'jsonb', default: {} })
   metadata: Record<string, unknown>;
+
+  /**
+   * Per-trade schema for validating pricing catalog position attributes.
+   */
+  @Column({ name: 'pricing_schema', type: 'jsonb', default: {} })
+  pricingSchema: Record<string, unknown>;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
