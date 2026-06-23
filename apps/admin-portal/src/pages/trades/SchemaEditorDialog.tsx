@@ -24,6 +24,11 @@ import {
   TradeConfigResponse,
   updateTradeConfig,
 } from '../../services/trades.service';
+import {
+  parseEnumValues,
+  parseOptionalNumber,
+  validatePricingSchemaFields,
+} from './schema-editor.utils';
 
 interface Props {
   trade: TradeConfigResponse | null;
@@ -34,21 +39,6 @@ interface Props {
 
 const fieldTypes: PricingSchemaFieldType[] = ['string', 'number', 'boolean', 'enum'];
 
-function parseOptionalNumber(value: string): number | undefined {
-  if (value.trim().length === 0) {
-    return undefined;
-  }
-
-  return Number(value);
-}
-
-function parseEnumValues(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function SchemaEditorDialog(props: Props): JSX.Element {
   const { trade, open, onClose, onSaved } = props;
   const { t } = useTranslation();
@@ -58,41 +48,12 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   const validationError = useMemo((): string | null => {
-    const names = fields.map((field) => field.name.trim());
-
-    if (names.some((name) => name.length === 0)) {
-      return t('trades.schemaEditor.validation.emptyName');
+    const validation = validatePricingSchemaFields(fields);
+    if (validation.valid) {
+      return null;
     }
-
-    const uniqueNames = new Set(names);
-
-    if (uniqueNames.size !== names.length) {
-      return t('trades.schemaEditor.validation.duplicateName');
-    }
-
-    const invalidNumberField = fields.find(
-      (field) =>
-        field.type === 'number' &&
-        field.min !== undefined &&
-        field.max !== undefined &&
-        field.min > field.max,
-    );
-
-    if (invalidNumberField) {
-      return t('trades.schemaEditor.validation.invalidNumberRange');
-    }
-
-    const invalidEnumField = fields.find(
-      (field) => field.type === 'enum' && (!field.values || field.values.length === 0),
-    );
-
-    if (invalidEnumField) {
-      return t('trades.schemaEditor.validation.emptyEnumValues');
-    }
-
-    return null;
+    return t(validation.messageKey);
   }, [fields, t]);
-
   useEffect(() => {
     if (!trade) {
       setFields([]);
