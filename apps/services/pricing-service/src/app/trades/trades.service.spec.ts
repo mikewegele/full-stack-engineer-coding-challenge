@@ -1,8 +1,7 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PricingCatalogStatus } from '../pricing-catalogs/entities/pricing-catalog.enums';
 import { PricingCatalogVersion } from '../pricing-catalogs/entities/pricing-catalog-version.entity';
 import { TradeConfig } from './entities/trade-config.entity';
 import { TradesService } from './trades.service';
@@ -122,6 +121,19 @@ describe('TradesService', () => {
       expect(repo.save).toHaveBeenCalled();
     });
 
+    it('updates the display name', async () => {
+      repo.findOne.mockResolvedValue(buildTradeConfig());
+      repo.save.mockImplementation((value) => Promise.resolve(value));
+
+      const result = await service.updateTradeConfig('HVAC', {
+        displayName: 'Heat pumps',
+      });
+
+      expect(result.displayName).toBe('Heat pumps');
+      expect(repo.save).toHaveBeenCalled();
+      expect(pricingCatalogVersions.find).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundException when trade does not exist', async () => {
       repo.findOne.mockResolvedValue(null);
 
@@ -144,14 +156,13 @@ describe('TradesService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('throws BadRequestException when new schema is incompatible with existing draft positions', async () => {
+    it('throws ConflictException when new schema is incompatible with existing positions', async () => {
       repo.findOne.mockResolvedValue(buildTradeConfig());
 
       pricingCatalogVersions.find.mockResolvedValue([
         {
           id: 'version-id',
           trade: 'HVAC',
-          status: PricingCatalogStatus.DRAFT,
           positions: [
             {
               key: 'install',
@@ -177,7 +188,7 @@ describe('TradesService', () => {
             ],
           },
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('checks existing catalog positions before saving a new schema', async () => {
