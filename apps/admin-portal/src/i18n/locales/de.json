@@ -31,15 +31,26 @@
   "trades": {
     "heading": "Trade-Konfiguration",
     "subheading": "Übersicht aller Trade-Kategorien und ihrer Preis-Schemas.",
+    "actions": {
+      "editSchema": "Schema bearbeiten"
+    },
     "columns": {
       "code": "Code",
       "displayName": "Bezeichnung",
       "isActive": "Aktiv",
-      "fieldCount": "Felder im Schema"
+      "fieldCount": "Felder im Schema",
+      "action": "Aktion"
     },
     "emptyState": "Keine Trade-Kategorien gefunden.",
     "loadFailed": "Trades konnten nicht geladen werden.",
     "viewSchema": "Schema ansehen",
+    "schemaEditor": {
+      "heading": "Schema für {{trade}}",
+      "emptyState": "Noch keine Schema-Felder konfiguriert.",
+      "addField": "Feld hinzufügen",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    },
     "schemaPlaceholder": "Für diese Trade-Kategorie ist noch kein Preis-Schema konfiguriert.",
     "schemaPropertyNames": {
       "name": "Name",

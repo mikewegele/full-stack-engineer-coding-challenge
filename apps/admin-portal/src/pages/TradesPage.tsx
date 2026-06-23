@@ -17,6 +17,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../services/api.service';
 import { listTrades, TradeConfigResponse } from '../services/trades.service';
+import { AppButton } from '../components/button/AppButton';
+import ModeEditOutlineOutlinedIcon from '@mui/icons-material/ModeEditOutlineOutlined';
+import { SchemaEditorDialog } from './trades/SchemaEditorDialog';
 
 /**
  * Read-only trade list. Shows the *current* state of each trade's pricing
@@ -34,6 +37,7 @@ export function TradesPage(): JSX.Element {
   const { t } = useTranslation();
   const [trades, setTrades] = useState<TradeConfigResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<TradeConfigResponse | null>(null);
 
   useEffect(() => {
     listTrades()
@@ -79,14 +83,15 @@ export function TradesPage(): JSX.Element {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>{t('trades.columns.code')}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>
-                    {t('trades.columns.displayName')}
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('trades.columns.displayName')}</TableCell>
                   <TableCell sx={{ fontWeight: 600 }} align="center">
                     {t('trades.columns.isActive')}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }} align="right">
                     {t('trades.columns.fieldCount')}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                    {t('trades.columns.action')}
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -112,6 +117,15 @@ export function TradesPage(): JSX.Element {
                         {countSchemaFields(trade.metadata)}
                       </Typography>
                     </TableCell>
+                    <TableCell align="right">
+                      <AppButton
+                        label={t('trades.actions.editSchema')}
+                        variant="outlined"
+                        size="small"
+                        startIcon={<ModeEditOutlineOutlinedIcon />}
+                        onClick={() => setSelectedTrade(trade)}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -119,6 +133,11 @@ export function TradesPage(): JSX.Element {
           </TableContainer>
         </Paper>
       )}
+      <SchemaEditorDialog
+        trade={selectedTrade}
+        open={selectedTrade !== null}
+        onClose={() => setSelectedTrade(null)}
+      />
 
       {/*
         TODO (candidate): per-trade detail / edit view goes here. Suggested:

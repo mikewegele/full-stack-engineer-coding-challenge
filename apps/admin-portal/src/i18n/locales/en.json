@@ -31,15 +31,26 @@
   "trades": {
     "heading": "Trade configuration",
     "subheading": "All trade categories and their pricing schemas.",
+    "actions": {
+      "editSchema": "Edit schema"
+    },
     "columns": {
       "code": "Code",
       "displayName": "Name",
       "isActive": "Active",
-      "fieldCount": "Schema fields"
+      "fieldCount": "Schema fields",
+      "action": "Action"
     },
     "emptyState": "No trade categories found.",
     "loadFailed": "Could not load trades.",
     "viewSchema": "View schema",
+    "schemaEditor": {
+      "heading": "Schema for {{trade}}",
+      "emptyState": "No schema fields configured yet.",
+      "addField": "Add field",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
     "schemaPlaceholder": "No pricing schema has been configured for this trade yet.",
     "schemaPropertyNames": {
       "name": "Name",
