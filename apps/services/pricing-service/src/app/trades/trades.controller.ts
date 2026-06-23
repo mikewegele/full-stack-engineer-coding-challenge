@@ -35,7 +35,11 @@ export class TradesController {
   @ApiResponse({ status: 200, type: TradeConfigResponseDto })
   @ApiResponse({
     status: 400,
-    description: 'New pricing schema is incompatible with existing draft catalogs',
+    description: 'Invalid trade configuration payload',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'New pricing schema is incompatible with existing catalog positions',
   })
   @ApiResponse({ status: 404, description: 'Trade not found' })
   async updateTradeConfig(

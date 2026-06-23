@@ -180,7 +180,7 @@ describe('TradesService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('does not check published catalog positions', async () => {
+    it('checks existing catalog positions before saving a new schema', async () => {
       repo.findOne.mockResolvedValue(buildTradeConfig());
       repo.save.mockImplementation((value) => Promise.resolve(value));
 
@@ -203,7 +203,6 @@ describe('TradesService', () => {
       expect(pricingCatalogVersions.find).toHaveBeenCalledWith({
         where: {
           trade: 'HVAC',
-          status: PricingCatalogStatus.DRAFT,
         },
         relations: ['positions'],
       });

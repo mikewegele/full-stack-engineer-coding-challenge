@@ -72,6 +72,8 @@ The schema supports:
 
 Validation is implemented as a pure function and is applied when draft positions are written.
 
+Schema updates through `PATCH /trades/:trade` return `409 Conflict` if they would invalidate existing positions.
+
 ---
 
 ## Publishing and Concurrency
@@ -143,3 +145,4 @@ The implementation is covered by tests for:
   - reviewing runtime and efficiency considerations
 
 - All AI-assisted changes were reviewed manually and validated with the existing test suite.
+

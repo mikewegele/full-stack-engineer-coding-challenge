@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TradeConfig } from './entities/trade-config.entity';
@@ -6,7 +11,6 @@ import { TradeConfigResponseDto } from './dto/trade-config-response.dto';
 import { UpdateTradeConfigDto } from './dto/update-trade-config.dto';
 import { PricingCatalogVersion } from '../pricing-catalogs/entities/pricing-catalog-version.entity';
 import { validatePricingAttributes } from '../pricing-catalogs/schema/pricing-schema.validator';
-import { PricingCatalogStatus } from '../pricing-catalogs/entities/pricing-catalog.enums';
 import { PricingSchema } from '../pricing-catalogs/schema/pricing-schema.types';
 
 @Injectable()
@@ -29,10 +33,13 @@ export class TradesService {
 
   async updateTradeConfig(trade: string, dto: UpdateTradeConfigDto): Promise<TradeConfig> {
     const found = await this.findEntityByCodeOrFail(trade);
-    if (dto.pricingSchema) {
+    if (dto.pricingSchema !== undefined) {
       const pricingSchema = this.parsePricingSchema(dto.pricingSchema);
-      await this.assertPricingSchemaCompatibleWithDrafts(trade, pricingSchema);
+      await this.assertPricingSchemaCompatibleWithExistingPositions(trade, pricingSchema);
       found.pricingSchema = dto.pricingSchema;
+    }
+    if (dto.displayName !== undefined) {
+      found.displayName = dto.displayName;
     }
     return this.repo.save(found);
   }
@@ -49,25 +56,30 @@ export class TradesService {
     return found;
   }
 
-  private async assertPricingSchemaCompatibleWithDrafts(
+  private async assertPricingSchemaCompatibleWithExistingPositions(
     trade: string,
     pricingSchema: PricingSchema,
   ): Promise<void> {
-    const draftVersions = await this.pricingCatalogVersions.find({
+    const versions = await this.pricingCatalogVersions.find({
       where: {
         trade,
-        status: PricingCatalogStatus.DRAFT,
       },
       relations: ['positions'],
     });
-    draftVersions.forEach((version) => {
+    versions.forEach((version) => {
       version.positions.forEach((position) => {
         const errors = validatePricingAttributes(pricingSchema, position.attributes ?? {});
+
         if (errors.length > 0) {
-          throw new BadRequestException({
-            message: `New pricing schema is incompatible with draft catalog ${version.id}`,
-            positionKey: position.key,
-            errors,
+          throw new ConflictException({
+            message: 'New pricing schema is incompatible with existing catalog positions',
+            conflicts: [
+              {
+                versionId: version.id,
+                positionKey: position.key,
+                errors,
+              },
+            ],
           });
         }
       });
