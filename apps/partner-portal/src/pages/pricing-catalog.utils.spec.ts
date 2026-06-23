@@ -9,38 +9,43 @@ import {
 describe('mapCatalogToTableRows', () => {
   it('maps backend catalog positions to table rows', () => {
     const catalog: PricingCatalogVersionResponse = {
-      id: 'version-1',
+      id: 'catalog-1',
       craftsmanId: 'craftsman-1',
-      trade: 'HVAC',
+      trade: 'hvac',
       status: 'DRAFT',
       effectiveFrom: '2026-01-01T00:00:00.000Z',
+      publishedByUserId: null,
       publishedAt: null,
+      discounts: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
       positions: [
         {
           id: 'position-1',
-          key: 'heat-pump',
-          label: 'Heat pump',
+          key: 'position-1',
+          label: 'Position 1',
           unit: 'piece',
-          netPriceCents: 1200000,
-          vatRate: '0.1900',
-          minQuantity: '1.000',
-          maxQuantity: '2.000',
+          netPriceCents: 12500,
+          vatRate: '0.19',
+          minQuantity: '1',
+          maxQuantity: '10',
           attributes: {
             heatingPowerKw: 12,
-            inverterModel: 'A1',
+            inverterModel: 'Eco 2000',
           },
+          surcharges: [],
         },
       ],
     };
 
     expect(mapCatalogToTableRows(catalog)).toEqual([
       {
-        key: 'heat-pump',
-        label: 'Heat pump',
+        key: 'position-1',
+        label: 'Position 1',
         unit: 'piece',
-        netPriceCents: 1200000,
-        vatRate: '0.1900',
-        attributesSummary: 'heatingPowerKw: 12, inverterModel: A1',
+        netPriceCents: 12500,
+        vatRate: '0.19',
+        attributesSummary: 'heatingPowerKw: 12, inverterModel: Eco 2000',
       },
     ]);
   });
@@ -55,12 +60,12 @@ describe('mapSchemaToFormFields', () => {
           type: 'number',
           required: true,
           min: 1,
-          max: 20,
+          max: 50,
         },
         {
-          name: 'frameMaterial',
+          name: 'inverterModel',
           type: 'enum',
-          values: ['wood', 'plastic'],
+          values: ['Eco 1000', 'Eco 2000'],
         },
       ],
     };
@@ -71,17 +76,17 @@ describe('mapSchemaToFormFields', () => {
         type: 'number',
         required: true,
         min: 1,
-        max: 20,
+        max: 50,
         values: undefined,
         dependsOn: undefined,
       },
       {
-        name: 'frameMaterial',
+        name: 'inverterModel',
         type: 'enum',
         required: false,
         min: undefined,
         max: undefined,
-        values: ['wood', 'plastic'],
+        values: ['Eco 1000', 'Eco 2000'],
         dependsOn: undefined,
       },
     ]);
@@ -97,8 +102,8 @@ describe('formatAttributesSummary', () => {
     expect(
       formatAttributesSummary({
         heatingPowerKw: 12,
-        inverterModel: 'A1',
+        inverterModel: 'Eco 2000',
       }),
-    ).toBe('heatingPowerKw: 12, inverterModel: A1');
+    ).toBe('heatingPowerKw: 12, inverterModel: Eco 2000');
   });
 });

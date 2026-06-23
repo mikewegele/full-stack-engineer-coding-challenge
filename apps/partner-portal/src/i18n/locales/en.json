@@ -7,6 +7,10 @@
       "network": "Could not reach the server."
     }
   },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
+  },
   "nav": {
     "profile": "My Profile",
     "pricing": "My Pricing Catalog",
@@ -34,6 +38,8 @@
     "positionCount": "{{count}} positions",
     "createDraft": "Start empty draft",
     "creatingDraft": "Creating draft…",
+    "publish": "Publish draft",
+    "publishing": "Publishing…",
     "sections": {
       "draft": "Current draft",
       "published": "Active published catalog"
@@ -54,15 +60,43 @@
     },
     "messages": {
       "loadFailed": "Could not load pricing catalog.",
-      "createDraftFailed": "Could not create draft."
+      "createDraftFailed": "Could not create draft.",
+      "draftCreated": "Draft was created.",
+      "positionSaved": "Position was saved.",
+      "positionSaveFailed": "Could not save position.",
+      "published": "Pricing catalog was published.",
+      "publishFailed": "Could not publish pricing catalog."
     },
     "positions": {
+      "add": "Add position",
       "key": "Key",
       "label": "Label",
       "unit": "Unit",
       "netPrice": "Net price",
       "vatRate": "VAT",
       "attributes": "Attributes"
+    },
+    "positionDialog": {
+      "title": "Add position",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "emptyValue": "Please select",
+      "noSchemaFields": "No schema fields are configured for this trade.",
+      "fields": {
+        "key": "Key",
+        "label": "Label",
+        "unit": "Unit",
+        "netPrice": "Net price in euros",
+        "vatRate": "VAT rate",
+        "minQuantity": "Minimum quantity",
+        "maxQuantity": "Maximum quantity"
+      },
+      "validation": {
+        "invalidNumber": "Enter a valid number.",
+        "min": "The value must be at least {{min}}.",
+        "max": "The value must be at most {{max}}."
+      }
     }
   },
   "profile": {

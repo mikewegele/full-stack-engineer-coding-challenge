@@ -1,10 +1,10 @@
 import {
   Alert,
-  Box,
   Button,
   Chip,
   Paper,
   Skeleton,
+  Snackbar,
   Stack,
   Tab,
   Table,
@@ -24,10 +24,15 @@ import {
   createPricingCatalog,
   listPricingCatalogs,
   listTrades,
+  PricingCatalogPositionResponse,
   PricingCatalogVersionResponse,
+  publishPricingCatalog,
   TradeCode,
   TradeConfigResponse,
+  updatePricingCatalog,
+  UpdatePricingCatalogPositionRequest,
 } from '../services/pricing-catalogs.service';
+import { PricingCatalogPositionDialog } from './PricingCatalogPositionDialog';
 import { mapCatalogToTableRows } from './pricing-catalog.utils';
 
 type CatalogsByTrade = Record<string, PricingCatalogVersionResponse[]>;
@@ -67,6 +72,30 @@ function formatVatRate(value: string): string {
   }).format(Number(value));
 }
 
+function toOptionalNumber(value: string | null): number | undefined {
+  if (value === null) {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
+function toUpdatePositionRequest(
+  position: PricingCatalogPositionResponse,
+): UpdatePricingCatalogPositionRequest {
+  return {
+    key: position.key,
+    label: position.label,
+    unit: position.unit,
+    netPriceCents: position.netPriceCents,
+    vatRate: Number(position.vatRate),
+    minQuantity: toOptionalNumber(position.minQuantity),
+    maxQuantity: toOptionalNumber(position.maxQuantity),
+    attributes: position.attributes,
+    surcharges: [],
+  };
+}
+
 export function PricingCatalogPage(): JSX.Element {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -78,6 +107,12 @@ export function PricingCatalogPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
+  const [positionDialogOpen, setPositionDialogOpen] = useState(false);
+  const [savingPosition, setSavingPosition] = useState(false);
+  const [publishingDraft, setPublishingDraft] = useState(false);
+  const [snack, setSnack] = useState<{ severity: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
   const assignedTrades = useMemo(() => {
     if (!craftsman) {
@@ -162,14 +197,81 @@ export function PricingCatalogPage(): JSX.Element {
         ...current,
         [selectedTrade]: [created, ...(current[selectedTrade] ?? [])],
       }));
+
+      setSnack({ severity: 'success', message: t('pricing.messages.draftCreated') });
     } catch (err: unknown) {
       const message =
         err instanceof ApiError ? err.message : t('pricing.messages.createDraftFailed');
-      setLoadError(message);
+
+      setSnack({ severity: 'error', message });
     } finally {
       setCreatingDraft(false);
     }
   }, [craftsman, selectedTrade, t]);
+
+  const savePosition = useCallback(
+    async (position: UpdatePricingCatalogPositionRequest): Promise<void> => {
+      if (!draft || !selectedTrade) {
+        return;
+      }
+
+      setSavingPosition(true);
+      setLoadError(null);
+
+      try {
+        const updated = await updatePricingCatalog(draft.id, {
+          positions: [...draft.positions.map(toUpdatePositionRequest), position],
+        });
+
+        setCatalogsByTrade((current) => ({
+          ...current,
+          [selectedTrade]: (current[selectedTrade] ?? []).map((catalog) =>
+            catalog.id === updated.id ? updated : catalog,
+          ),
+        }));
+
+        setPositionDialogOpen(false);
+        setSnack({ severity: 'success', message: t('pricing.messages.positionSaved') });
+      } catch (err: unknown) {
+        const message =
+          err instanceof ApiError ? err.message : t('pricing.messages.positionSaveFailed');
+
+        setSnack({ severity: 'error', message });
+      } finally {
+        setSavingPosition(false);
+      }
+    },
+    [draft, selectedTrade, t],
+  );
+
+  const publishDraft = useCallback(async (): Promise<void> => {
+    if (!draft || !selectedTrade) {
+      return;
+    }
+
+    setPublishingDraft(true);
+    setLoadError(null);
+
+    try {
+      const publishedCatalog = await publishPricingCatalog(draft.id);
+
+      setCatalogsByTrade((current) => ({
+        ...current,
+        [selectedTrade]: [
+          publishedCatalog,
+          ...(current[selectedTrade] ?? []).filter((catalog) => catalog.id !== publishedCatalog.id),
+        ],
+      }));
+
+      setSnack({ severity: 'success', message: t('pricing.messages.published') });
+    } catch (err: unknown) {
+      const message = err instanceof ApiError ? err.message : t('pricing.messages.publishFailed');
+
+      setSnack({ severity: 'error', message });
+    } finally {
+      setPublishingDraft(false);
+    }
+  }, [draft, selectedTrade, t]);
 
   if (loading) {
     return (
@@ -258,7 +360,13 @@ export function PricingCatalogPage(): JSX.Element {
           </Stack>
 
           {draft ? (
-            <CatalogPositionsTable catalog={draft} title={t('pricing.sections.draft')} />
+            <CatalogPositionsTable
+              catalog={draft}
+              title={t('pricing.sections.draft')}
+              publishing={publishingDraft}
+              onAddPosition={() => setPositionDialogOpen(true)}
+              onPublish={publishDraft}
+            />
           ) : (
             <Paper variant="outlined" sx={{ p: 3 }}>
               <Stack spacing={2} alignItems="flex-start">
@@ -276,10 +384,31 @@ export function PricingCatalogPage(): JSX.Element {
           )}
 
           {published ? (
-            <CatalogSummary catalog={published} title={t('pricing.sections.published')} />
+            <CatalogPositionsTable catalog={published} title={t('pricing.sections.published')} />
           ) : null}
         </Stack>
       </Paper>
+
+      <PricingCatalogPositionDialog
+        open={positionDialogOpen}
+        fields={selectedTradeConfig?.pricingSchema?.fields ?? []}
+        onClose={() => setPositionDialogOpen(false)}
+        onSave={savePosition}
+        saving={savingPosition}
+      />
+
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={3500}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        {snack ? (
+          <Alert severity={snack.severity} onClose={() => setSnack(null)}>
+            {snack.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Stack>
   );
 }
@@ -287,10 +416,14 @@ export function PricingCatalogPage(): JSX.Element {
 function CatalogPositionsTable(props: {
   catalog: PricingCatalogVersionResponse;
   title: string;
+  publishing?: boolean;
+  onAddPosition?: () => void;
+  onPublish?: () => void;
 }): JSX.Element {
-  const { catalog, title } = props;
+  const { catalog, title, publishing = false, onAddPosition, onPublish } = props;
   const { t } = useTranslation();
   const rows = mapCatalogToTableRows(catalog);
+  const canEdit = !!onAddPosition && !!onPublish;
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -303,7 +436,24 @@ function CatalogPositionsTable(props: {
             </Typography>
           </Stack>
 
-          <Chip label={catalog.status} />
+          <Stack direction="row" spacing={1} alignItems="center">
+            {canEdit ? (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={onAddPosition}
+                  disabled={publishing}
+                >
+                  {t('pricing.positions.add')}
+                </Button>
+                <Button variant="contained" size="small" onClick={onPublish} disabled={publishing}>
+                  {publishing ? t('pricing.publishing') : t('pricing.publish')}
+                </Button>
+              </>
+            ) : null}
+            <Chip label={catalog.status} />
+          </Stack>
         </Stack>
 
         {rows.length === 0 ? (
@@ -334,35 +484,6 @@ function CatalogPositionsTable(props: {
             </TableBody>
           </Table>
         )}
-      </Stack>
-    </Paper>
-  );
-}
-
-function CatalogSummary(props: {
-  catalog: PricingCatalogVersionResponse;
-  title: string;
-}): JSX.Element {
-  const { catalog, title } = props;
-  const { t } = useTranslation();
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack spacing={1}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
-          <Typography variant="h3">{title}</Typography>
-          <Chip label={catalog.status} />
-        </Stack>
-
-        <Typography variant="body2" color="text.secondary">
-          {t('pricing.effectiveFrom', { date: formatDate(catalog.effectiveFrom) })}
-        </Typography>
-
-        <Box>
-          <Typography variant="body2" color="text.secondary">
-            {t('pricing.positionCount', { count: catalog.positions.length })}
-          </Typography>
-        </Box>
       </Stack>
     </Paper>
   );

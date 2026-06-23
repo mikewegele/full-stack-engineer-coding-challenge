@@ -63,6 +63,7 @@ export class PricingCatalogsService {
         craftsmanId: query.craftsmanId,
       });
     }
+
     if (query.trade) {
       qb.andWhere('version.trade = :trade', { trade: query.trade });
     }
@@ -71,6 +72,7 @@ export class PricingCatalogsService {
       if (!user.craftsmanId) {
         return [];
       }
+
       qb.andWhere('version.craftsmanId = :userCraftsmanId', {
         userCraftsmanId: user.craftsmanId,
       });
@@ -103,6 +105,7 @@ export class PricingCatalogsService {
     this.assertCanAccess(dto.craftsmanId, user);
     await this.assertCraftsmanIsActive(dto.craftsmanId);
     await this.assertCraftsmanIsAssignedToTrade(dto.craftsmanId, dto.trade);
+
     const version = this.versions.create({
       craftsmanId: dto.craftsmanId,
       trade: dto.trade,
@@ -137,13 +140,17 @@ export class PricingCatalogsService {
         discounts: true,
       },
     });
+
     if (!existing) {
       throw new NotFoundException(`Pricing catalog ${versionId} not found`);
     }
+
     this.assertCanAccess(existing.craftsmanId, user);
+
     if (existing.status !== PricingCatalogStatus.DRAFT) {
       throw new BadRequestException('Only draft pricing catalogs can be updated');
     }
+
     if (dto.positions !== undefined) {
       await this.validatePositionAttributes(existing.trade, dto.positions);
     }
@@ -203,16 +210,19 @@ export class PricingCatalogsService {
     const published = await this.versions.manager.transaction(async (manager) => {
       const version = await manager.findOne(PricingCatalogVersion, {
         where: { id: versionId },
-        relations: ['positions', 'positions.surcharges', 'discounts'],
         lock: { mode: 'pessimistic_write' },
       });
+
       if (!version) {
         throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
       }
+
       this.assertCanAccess(version.craftsmanId, user);
+
       if (version.status !== PricingCatalogStatus.DRAFT) {
         throw new BadRequestException('Only draft pricing catalogs can be published');
       }
+
       const existingPublished = await manager.findOne(PricingCatalogVersion, {
         where: {
           craftsmanId: version.craftsmanId,
@@ -221,14 +231,17 @@ export class PricingCatalogsService {
         },
         lock: { mode: 'pessimistic_write' },
       });
+
       if (existingPublished) {
         throw new BadRequestException(
           `A published pricing catalog already exists for craftsman ${version.craftsmanId} and trade ${version.trade}`,
         );
       }
+
       version.status = PricingCatalogStatus.PUBLISHED;
       version.publishedAt = new Date();
       version.publishedByUserId = user.sub;
+
       return manager.save(PricingCatalogVersion, version);
     });
 
@@ -244,21 +257,20 @@ export class PricingCatalogsService {
     this.assertCanAccess(id, user);
     await this.assertCraftsmanIsActive(id);
     await this.assertCraftsmanIsAssignedToTrade(id, trade);
+
     const version = await this.findActivePublishedVersionOrFail(id, trade);
     return calculateQuote(version, dto);
   }
-
-  // ---------------------------------------------------------------------
-  // Private helper methods
-  // ---------------------------------------------------------------------
 
   private async assertCraftsmanIsActive(craftsmanId: string): Promise<void> {
     const craftsman = await this.craftsmen.findOne({
       where: { id: craftsmanId },
     });
+
     if (!craftsman) {
       throw new NotFoundException(`Craftsman ${craftsmanId} not found`);
     }
+
     if (!craftsman.isActive) {
       throw new BadRequestException(`Craftsman ${craftsmanId} is inactive`);
     }
@@ -275,6 +287,7 @@ export class PricingCatalogsService {
         isActive: true,
       },
     });
+
     if (!assignment) {
       throw new BadRequestException(`Craftsman ${craftsmanId} is not assigned to trade ${trade}`);
     }
@@ -285,9 +298,11 @@ export class PricingCatalogsService {
     user: JwtPayload,
   ): Promise<PricingCatalogVersion> {
     const version = await this.findVersionWithRelations({ id: versionId });
+
     if (!version) {
       throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
     }
+
     this.assertCanAccess(version.craftsmanId, user);
     return version;
   }
@@ -301,11 +316,13 @@ export class PricingCatalogsService {
       trade,
       status: PricingCatalogStatus.PUBLISHED,
     });
+
     if (!version) {
       throw new NotFoundException(
         `Active published pricing catalog for craftsman ${craftsmanId} and trade ${trade} not found`,
       );
     }
+
     return version;
   }
 
@@ -314,7 +331,12 @@ export class PricingCatalogsService {
   ): Promise<PricingCatalogVersion | null> {
     return this.versions.findOne({
       where,
-      relations: ['positions', 'positions.surcharges', 'discounts'],
+      relations: {
+        positions: {
+          surcharges: true,
+        },
+        discounts: true,
+      },
       order: {
         positions: {
           key: 'ASC',

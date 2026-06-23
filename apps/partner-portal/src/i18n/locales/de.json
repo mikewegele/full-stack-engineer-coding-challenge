@@ -7,6 +7,10 @@
       "network": "Verbindung zum Server fehlgeschlagen."
     }
   },
+  "common": {
+    "yes": "Ja",
+    "no": "Nein"
+  },
   "nav": {
     "profile": "Mein Profil",
     "pricing": "Mein Preiskatalog",
@@ -34,6 +38,8 @@
     "positionCount": "{{count}} Positionen",
     "createDraft": "Leere Draft starten",
     "creatingDraft": "Draft wird erstellt …",
+    "publish": "Draft veröffentlichen",
+    "publishing": "Wird veröffentlicht …",
     "sections": {
       "draft": "Aktuelle Draft",
       "published": "Aktiv veröffentlichter Katalog"
@@ -54,15 +60,43 @@
     },
     "messages": {
       "loadFailed": "Preiskatalog konnte nicht geladen werden.",
-      "createDraftFailed": "Draft konnte nicht erstellt werden."
+      "createDraftFailed": "Draft konnte nicht erstellt werden.",
+      "draftCreated": "Draft wurde erstellt.",
+      "positionSaved": "Position wurde gespeichert.",
+      "positionSaveFailed": "Position konnte nicht gespeichert werden.",
+      "published": "Preiskatalog wurde veröffentlicht.",
+      "publishFailed": "Preiskatalog konnte nicht veröffentlicht werden."
     },
     "positions": {
+      "add": "Position hinzufügen",
       "key": "Key",
       "label": "Bezeichnung",
       "unit": "Einheit",
       "netPrice": "Nettopreis",
       "vatRate": "MwSt.",
       "attributes": "Attribute"
+    },
+    "positionDialog": {
+      "title": "Position hinzufügen",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert …",
+      "emptyValue": "Bitte auswählen",
+      "noSchemaFields": "Für diesen Trade sind keine Schema-Felder konfiguriert.",
+      "fields": {
+        "key": "Key",
+        "label": "Bezeichnung",
+        "unit": "Einheit",
+        "netPrice": "Nettopreis in Euro",
+        "vatRate": "MwSt.-Satz",
+        "minQuantity": "Mindestmenge",
+        "maxQuantity": "Maximalmenge"
+      },
+      "validation": {
+        "invalidNumber": "Bitte gib eine gültige Zahl ein.",
+        "min": "Der Wert muss mindestens {{min}} sein.",
+        "max": "Der Wert darf höchstens {{max}} sein."
+      }
     }
   },
   "profile": {

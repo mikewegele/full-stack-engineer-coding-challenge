@@ -54,6 +54,20 @@ export type PricingCatalogVersionResponse = Omit<
 
 export type CreatePricingCatalogRequest = components['schemas']['CreatePricingCatalogDto'];
 
+export type UpdatePricingCatalogRequest = Omit<
+  components['schemas']['UpdatePricingCatalogDto'],
+  'positions'
+> & {
+  positions?: UpdatePricingCatalogPositionRequest[];
+};
+
+export type UpdatePricingCatalogPositionRequest = Omit<
+  components['schemas']['UpdatePricingCatalogPositionDto'],
+  'attributes'
+> & {
+  attributes?: Record<string, unknown>;
+};
+
 export function listTrades(): Promise<TradeConfigResponse[]> {
   return apiClient.get<TradeConfigResponse[]>('/trades').then((response) => response.data);
 }
@@ -77,5 +91,20 @@ export function createPricingCatalog(
 ): Promise<PricingCatalogVersionResponse> {
   return apiClient
     .post<PricingCatalogVersionResponse>('/pricing-catalogs', payload)
+    .then((response) => response.data);
+}
+
+export function updatePricingCatalog(
+  versionId: string,
+  payload: UpdatePricingCatalogRequest,
+): Promise<PricingCatalogVersionResponse> {
+  return apiClient
+    .patch<PricingCatalogVersionResponse>(`/pricing-catalogs/${versionId}`, payload)
+    .then((response) => response.data);
+}
+
+export function publishPricingCatalog(versionId: string): Promise<PricingCatalogVersionResponse> {
+  return apiClient
+    .post<PricingCatalogVersionResponse>(`/pricing-catalogs/${versionId}/publish`)
     .then((response) => response.data);
 }
