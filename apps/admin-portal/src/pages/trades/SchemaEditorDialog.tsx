@@ -34,23 +34,42 @@ interface Props {
 
 const fieldTypes: PricingSchemaFieldType[] = ['string', 'number', 'boolean', 'enum'];
 
+function parseOptionalNumber(value: string): number | undefined {
+  if (value.trim().length === 0) {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
+function parseEnumValues(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function SchemaEditorDialog(props: Props): JSX.Element {
   const { trade, open, onClose, onSaved } = props;
   const { t } = useTranslation();
   const [fields, setFields] = useState<PricingSchemaField[]>([]);
+  const [enumValueInputs, setEnumValueInputs] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validationError = useMemo((): string | null => {
     const names = fields.map((field) => field.name.trim());
+
     if (names.some((name) => name.length === 0)) {
       return t('trades.schemaEditor.validation.emptyName');
     }
+
     const uniqueNames = new Set(names);
 
     if (uniqueNames.size !== names.length) {
       return t('trades.schemaEditor.validation.duplicateName');
     }
+
     const invalidNumberField = fields.find(
       (field) =>
         field.type === 'number' &&
@@ -58,26 +77,38 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
         field.max !== undefined &&
         field.min > field.max,
     );
+
     if (invalidNumberField) {
       return t('trades.schemaEditor.validation.invalidNumberRange');
     }
+
     const invalidEnumField = fields.find(
       (field) => field.type === 'enum' && (!field.values || field.values.length === 0),
     );
+
     if (invalidEnumField) {
       return t('trades.schemaEditor.validation.emptyEnumValues');
     }
+
     return null;
   }, [fields, t]);
 
   useEffect(() => {
     if (!trade) {
       setFields([]);
+      setEnumValueInputs({});
       setError(null);
       return;
     }
 
-    setFields(trade.pricingSchema?.fields ?? []);
+    const initialFields = trade.pricingSchema?.fields ?? [];
+
+    setFields(initialFields);
+    setEnumValueInputs(
+      Object.fromEntries(
+        initialFields.map((field, index) => [index, (field.values ?? []).join(', ')]),
+      ),
+    );
     setError(null);
   }, [trade]);
 
@@ -98,18 +129,72 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
     );
   }, []);
 
+  const updateFieldType = useCallback(
+    (index: number, type: PricingSchemaFieldType): void => {
+      updateField(index, {
+        type,
+        min: undefined,
+        max: undefined,
+        values: type === 'enum' ? [] : undefined,
+      });
+
+      if (type === 'enum') {
+        setEnumValueInputs((current) => ({
+          ...current,
+          [index]: '',
+        }));
+        return;
+      }
+
+      setEnumValueInputs((current) => {
+        const next = { ...current };
+        delete next[index];
+        return next;
+      });
+    },
+    [updateField],
+  );
+
+  const updateEnumValues = useCallback(
+    (index: number, value: string): void => {
+      setEnumValueInputs((current) => ({
+        ...current,
+        [index]: value,
+      }));
+
+      updateField(index, {
+        values: parseEnumValues(value),
+      });
+    },
+    [updateField],
+  );
+
   const removeField = useCallback((index: number): void => {
     setFields((current) => current.filter((_, fieldIndex) => fieldIndex !== index));
+
+    setEnumValueInputs((current) =>
+      Object.fromEntries(
+        Object.entries(current)
+          .filter(([key]) => Number(key) !== index)
+          .map(([key, value]) => {
+            const numericKey = Number(key);
+
+            return [numericKey > index ? numericKey - 1 : numericKey, value];
+          }),
+      ),
+    );
   }, []);
 
   const save = useCallback(async (): Promise<void> => {
     if (!trade) {
       return;
     }
+
     if (validationError) {
       setError(validationError);
       return;
     }
+
     setSaving(true);
     setError(null);
 
@@ -131,11 +216,11 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
   }, [fields, onClose, onSaved, t, trade, validationError]);
 
   if (!trade) {
-    return <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" />;
+    return <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg" />;
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
       <DialogTitle>
         <Stack spacing={0.5}>
           <Typography variant="h2">
@@ -154,9 +239,11 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
           <If condition={error !== null}>
             <Alert severity="error">{error}</Alert>
           </If>
+
           <If condition={error === null && validationError !== null}>
             <Alert severity="warning">{validationError}</Alert>
           </If>
+
           <If condition={fields.length === 0}>
             <Alert severity="info">{t('trades.schemaEditor.emptyState')}</Alert>
           </If>
@@ -183,12 +270,7 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                         label={t('trades.schemaEditor.fields.type')}
                         value={field.type}
                         onChange={(event) =>
-                          updateField(index, {
-                            type: event.target.value as PricingSchemaFieldType,
-                            min: undefined,
-                            max: undefined,
-                            values: undefined,
-                          })
+                          updateFieldType(index, event.target.value as PricingSchemaFieldType)
                         }
                         fullWidth
                       >
@@ -230,8 +312,7 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                           value={field.min ?? ''}
                           onChange={(event) =>
                             updateField(index, {
-                              min:
-                                event.target.value === '' ? undefined : Number(event.target.value),
+                              min: parseOptionalNumber(event.target.value),
                             })
                           }
                           fullWidth
@@ -243,8 +324,7 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                           value={field.max ?? ''}
                           onChange={(event) =>
                             updateField(index, {
-                              max:
-                                event.target.value === '' ? undefined : Number(event.target.value),
+                              max: parseOptionalNumber(event.target.value),
                             })
                           }
                           fullWidth
@@ -255,16 +335,9 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                     <If condition={field.type === 'enum'}>
                       <TextField
                         label={t('trades.schemaEditor.fields.values')}
-                        value={(field.values ?? []).join(', ')}
+                        value={enumValueInputs[index] ?? ''}
+                        onChange={(event) => updateEnumValues(index, event.target.value)}
                         helperText={t('trades.schemaEditor.valuesHelp')}
-                        onChange={(event) =>
-                          updateField(index, {
-                            values: event.target.value
-                              .split(',')
-                              .map((value) => value.trim())
-                              .filter(Boolean),
-                          })
-                        }
                         fullWidth
                       />
                     </If>
@@ -288,7 +361,7 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
           label={t('trades.schemaEditor.save')}
           onClick={save}
           disabled={saving || validationError !== null}
-        />{' '}
+        />
       </DialogActions>
     </Dialog>
   );
