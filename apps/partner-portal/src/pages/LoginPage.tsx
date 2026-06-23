@@ -26,9 +26,10 @@ export function LoginPage(): JSX.Element {
   const onSubmit = async (values: LoginForm): Promise<void> => {
     setSubmitting(true);
     setSubmitError(null);
+
     try {
       await login(values.email, values.password);
-      navigate('/profile');
+      navigate('/pricing');
     } catch {
       setSubmitError(t('login.errors.invalidCredentials'));
     } finally {
@@ -72,6 +73,7 @@ export function LoginPage(): JSX.Element {
                 error={!!errors.email}
                 helperText={errors.email?.message}
               />
+
               <TextField
                 label={t('login.password')}
                 type="password"
@@ -82,10 +84,13 @@ export function LoginPage(): JSX.Element {
                 error={!!errors.password}
                 helperText={errors.password?.message}
               />
-              {submitError && <Alert severity="error">{submitError}</Alert>}
+
+              {submitError ? <Alert severity="error">{submitError}</Alert> : null}
+
               <Button type="submit" variant="contained" disabled={submitting}>
                 {submitting ? t('login.submitting') : t('login.submit')}
               </Button>
+
               <Typography variant="caption" color="text.secondary">
                 {t('login.hint')}
               </Typography>
