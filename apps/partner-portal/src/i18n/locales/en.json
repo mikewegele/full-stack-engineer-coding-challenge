@@ -26,6 +26,36 @@
     },
     "hint": "Use admin@example.com / admin123 or partner@example.com / partner123."
   },
+  "pricing": {
+    "heading": "My Pricing Catalog",
+    "subheading": "Manage your pricing catalogs per trade category.",
+    "schemaFields": "{{count}} schema fields",
+    "effectiveFrom": "Effective from {{date}}",
+    "positionCount": "{{count}} positions",
+    "createDraft": "Start empty draft",
+    "creatingDraft": "Creating draft…",
+    "sections": {
+      "draft": "Current draft",
+      "published": "Active published catalog"
+    },
+    "status": {
+      "hasDraft": "Draft available",
+      "noDraft": "No draft",
+      "hasPublished": "Published",
+      "noPublished": "Not published"
+    },
+    "empty": {
+      "noCraftsman": "No craftsman is linked to this account.",
+      "noTrades": "No trade categories are assigned to you yet.",
+      "noDraftTitle": "No draft yet",
+      "noDraftFromPublished": "Start a new draft to edit the active catalog.",
+      "noDraftEmpty": "Start an empty draft to create your first pricing catalog."
+    },
+    "messages": {
+      "loadFailed": "Could not load pricing catalog.",
+      "createDraftFailed": "Could not create draft."
+    }
+  },
   "profile": {
     "heading": "My Profile",
     "subheading": "Manage your business information and trade categories.",

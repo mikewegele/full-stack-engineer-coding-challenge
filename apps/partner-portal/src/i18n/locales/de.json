@@ -26,6 +26,36 @@
     },
     "hint": "Verwende admin@example.com / admin123 oder partner@example.com / partner123."
   },
+  "pricing": {
+    "heading": "Mein Preiskatalog",
+    "subheading": "Verwalte Deine Preis-Kataloge pro Trade-Kategorie.",
+    "schemaFields": "{{count}} Schema-Felder",
+    "effectiveFrom": "Gültig ab {{date}}",
+    "positionCount": "{{count}} Positionen",
+    "createDraft": "Leere Draft starten",
+    "creatingDraft": "Draft wird erstellt …",
+    "sections": {
+      "draft": "Aktuelle Draft",
+      "published": "Aktiv veröffentlichter Katalog"
+    },
+    "status": {
+      "hasDraft": "Draft vorhanden",
+      "noDraft": "Keine Draft",
+      "hasPublished": "Veröffentlicht",
+      "noPublished": "Nicht veröffentlicht"
+    },
+    "empty": {
+      "noCraftsman": "Es ist kein Craftsman mit diesem Konto verknüpft.",
+      "noTrades": "Dir sind noch keine Trade-Kategorien zugeordnet.",
+      "noDraftTitle": "Noch keine Draft vorhanden",
+      "noDraftFromPublished": "Starte eine neue Draft, um den aktiven Katalog zu bearbeiten.",
+      "noDraftEmpty": "Starte eine leere Draft, um Deinen ersten Preiskatalog anzulegen."
+    },
+    "messages": {
+      "loadFailed": "Preiskatalog konnte nicht geladen werden.",
+      "createDraftFailed": "Draft konnte nicht erstellt werden."
+    }
+  },
   "profile": {
     "heading": "Mein Profil",
     "subheading": "Verwalte Deine Stammdaten und Trade-Kategorien.",
