@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards, } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '@sandbox/auth';
 import { JwtPayload, UserRole } from '@sandbox/types';
@@ -18,6 +8,8 @@ import { PricingCatalogsService } from './pricing-catalogs.service';
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
 import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 import { UpdatePricingCatalogDto } from './dto/update-pricing-catalog.dto';
+import { QuoteResult } from './quote/quote.types';
+import { QuoteRequestDto } from './dto/quote-request.dto';
 
 @ApiTags('Pricing Catalogs')
 @ApiBearerAuth()
@@ -79,5 +71,20 @@ export class PricingCatalogsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<PricingCatalogResponseDto> {
     return this.service.updateDraft(versionId, dto, user);
+  }
+
+  @Post(':versionId/quote')
+  @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
+  @ApiOperation({ summary: 'Calculate a quote for an exact pricing catalog version' })
+  @ApiResponse({ status: 200, description: 'Calculated quote breakdown' })
+  @ApiResponse({ status: 400, description: 'Quote request is invalid' })
+  @ApiResponse({ status: 403, description: 'Caller may not quote this pricing catalog' })
+  @ApiResponse({ status: 404, description: 'Pricing catalog version not found' })
+  createQuote(
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() dto: QuoteRequestDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<QuoteResult> {
+    return this.service.quoteVersion(versionId, dto, user);
   }
 }

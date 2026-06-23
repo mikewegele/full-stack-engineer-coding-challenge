@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { Repository } from 'typeorm';
@@ -10,13 +15,19 @@ import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
-import { UpdatePricingCatalogDto, UpdatePricingCatalogPositionDto, } from './dto/update-pricing-catalog.dto';
+import {
+  UpdatePricingCatalogDto,
+  UpdatePricingCatalogPositionDto,
+} from './dto/update-pricing-catalog.dto';
 import { PricingCatalogPosition } from './entities/pricing-catalog-position.entity';
 import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
 import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
 import { TradeConfig } from '../trades/entities/trade-config.entity';
 import { PricingSchema } from './schema/pricing-schema.types';
 import { validatePricingAttributes } from './schema/pricing-schema.validator';
+import { calculateQuote } from './quote/quote.calculator';
+import { QuoteResult } from './quote/quote.types';
+import { QuoteRequestDto } from './dto/quote-request.dto';
 
 @Injectable()
 export class PricingCatalogsService {
@@ -75,25 +86,18 @@ export class PricingCatalogsService {
   }
 
   async findOne(versionId: string, user: JwtPayload): Promise<PricingCatalogResponseDto> {
-    const version = await this.versions.findOne({
-      where: { id: versionId },
-      relations: ['positions', 'positions.surcharges', 'discounts'],
-      order: {
-        positions: {
-          key: 'ASC',
-        },
-        discounts: {
-          sortOrder: 'ASC',
-        },
-      },
-    });
-
-    if (!version) {
-      throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
-    }
-
-    this.assertCanAccess(version.craftsmanId, user);
+    const version = await this.findVersionEntityOrFail(versionId, user);
     return PricingCatalogResponseDto.from(version);
+  }
+
+  async quoteVersion(
+    versionId: string,
+    dto: QuoteRequestDto,
+    user: JwtPayload,
+  ): Promise<QuoteResult> {
+    const version = await this.findVersionEntityOrFail(versionId, user);
+
+    return calculateQuote(version, dto);
   }
 
   async create(dto: CreatePricingCatalogDto, user: JwtPayload): Promise<PricingCatalogResponseDto> {
@@ -223,6 +227,32 @@ export class PricingCatalogsService {
   // ---------------------------------------------------------------------
   // Private helper methods
   // ---------------------------------------------------------------------
+
+  private async findVersionEntityOrFail(
+    versionId: string,
+    user: JwtPayload,
+  ): Promise<PricingCatalogVersion> {
+    const version = await this.versions.findOne({
+      where: { id: versionId },
+      relations: ['positions', 'positions.surcharges', 'discounts'],
+      order: {
+        positions: {
+          key: 'ASC',
+        },
+        discounts: {
+          sortOrder: 'ASC',
+        },
+      },
+    });
+
+    if (!version) {
+      throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
+    }
+
+    this.assertCanAccess(version.craftsmanId, user);
+
+    return version;
+  }
 
   private async validatePositionAttributes(
     trade: string,
