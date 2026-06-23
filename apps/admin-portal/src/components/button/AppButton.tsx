@@ -1,10 +1,10 @@
 import { Button, ButtonProps } from '@mui/material';
 
-type AppButtonProps = Omit<ButtonProps, 'children'> & {
+type Props = Omit<ButtonProps, 'children'> & {
   label: string;
 };
 
-export function AppButton(props: AppButtonProps): JSX.Element {
+export function AppButton(props: Props): JSX.Element {
   const { label, variant = 'contained', size = 'medium', ...buttonProps } = props;
 
   return (

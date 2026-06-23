@@ -1,3 +1,4 @@
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import {
   Alert,
   Dialog,
@@ -5,22 +6,129 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
+  MenuItem,
+  Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppButton } from '../../components/button/AppButton';
-import { TradeConfigResponse } from '../../services/trades.service';
+import { If } from '../../components/helper/If';
+import { ApiError } from '../../services/api.service';
+import {
+  PricingSchemaField,
+  PricingSchemaFieldType,
+  TradeConfigResponse,
+  updateTradeConfig,
+} from '../../services/trades.service';
 
-type SchemaEditorDialogProps = {
+interface Props {
   trade: TradeConfigResponse | null;
   open: boolean;
   onClose: () => void;
-};
+  onSaved: (trade: TradeConfigResponse) => void;
+}
 
-export function SchemaEditorDialog(props: SchemaEditorDialogProps): JSX.Element {
-  const { trade, open, onClose } = props;
+const fieldTypes: PricingSchemaFieldType[] = ['string', 'number', 'boolean', 'enum'];
+
+export function SchemaEditorDialog(props: Props): JSX.Element {
+  const { trade, open, onClose, onSaved } = props;
   const { t } = useTranslation();
+  const [fields, setFields] = useState<PricingSchemaField[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const validationError = useMemo((): string | null => {
+    const names = fields.map((field) => field.name.trim());
+    if (names.some((name) => name.length === 0)) {
+      return t('trades.schemaEditor.validation.emptyName');
+    }
+    const uniqueNames = new Set(names);
+
+    if (uniqueNames.size !== names.length) {
+      return t('trades.schemaEditor.validation.duplicateName');
+    }
+    const invalidNumberField = fields.find(
+      (field) =>
+        field.type === 'number' &&
+        field.min !== undefined &&
+        field.max !== undefined &&
+        field.min > field.max,
+    );
+    if (invalidNumberField) {
+      return t('trades.schemaEditor.validation.invalidNumberRange');
+    }
+    const invalidEnumField = fields.find(
+      (field) => field.type === 'enum' && (!field.values || field.values.length === 0),
+    );
+    if (invalidEnumField) {
+      return t('trades.schemaEditor.validation.emptyEnumValues');
+    }
+    return null;
+  }, [fields, t]);
+
+  useEffect(() => {
+    if (!trade) {
+      setFields([]);
+      setError(null);
+      return;
+    }
+
+    setFields(trade.pricingSchema?.fields ?? []);
+    setError(null);
+  }, [trade]);
+
+  const addField = useCallback((): void => {
+    setFields((current) => [
+      ...current,
+      {
+        name: '',
+        type: 'string',
+        required: false,
+      },
+    ]);
+  }, []);
+
+  const updateField = useCallback((index: number, patch: Partial<PricingSchemaField>): void => {
+    setFields((current) =>
+      current.map((field, fieldIndex) => (fieldIndex === index ? { ...field, ...patch } : field)),
+    );
+  }, []);
+
+  const removeField = useCallback((index: number): void => {
+    setFields((current) => current.filter((_, fieldIndex) => fieldIndex !== index));
+  }, []);
+
+  const save = useCallback(async (): Promise<void> => {
+    if (!trade) {
+      return;
+    }
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+
+    try {
+      const updated = await updateTradeConfig(trade.trade, {
+        pricingSchema: {
+          fields,
+        },
+      });
+
+      onSaved(updated);
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof ApiError ? err.message : t('trades.schemaEditor.saveFailed');
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  }, [fields, onClose, onSaved, t, trade, validationError]);
 
   if (!trade) {
     return <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" />;
@@ -43,19 +151,144 @@ export function SchemaEditorDialog(props: SchemaEditorDialogProps): JSX.Element 
 
       <DialogContent>
         <Stack spacing={2}>
-          <Alert severity="info">{t('trades.schemaEditor.emptyState')}</Alert>
+          <If condition={error !== null}>
+            <Alert severity="error">{error}</Alert>
+          </If>
+          <If condition={error === null && validationError !== null}>
+            <Alert severity="warning">{validationError}</Alert>
+          </If>
+          <If condition={fields.length === 0}>
+            <Alert severity="info">{t('trades.schemaEditor.emptyState')}</Alert>
+          </If>
+
+          <If condition={fields.length > 0}>
+            <Stack spacing={2}>
+              {fields.map((field, index) => (
+                <Paper key={index} variant="outlined" sx={{ p: 2 }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction={{ xs: 'column', md: 'row' }}
+                      spacing={2}
+                      alignItems={{ xs: 'stretch', md: 'center' }}
+                    >
+                      <TextField
+                        label={t('trades.schemaEditor.fields.name')}
+                        value={field.name}
+                        onChange={(event) => updateField(index, { name: event.target.value })}
+                        fullWidth
+                      />
+
+                      <TextField
+                        select
+                        label={t('trades.schemaEditor.fields.type')}
+                        value={field.type}
+                        onChange={(event) =>
+                          updateField(index, {
+                            type: event.target.value as PricingSchemaFieldType,
+                            min: undefined,
+                            max: undefined,
+                            values: undefined,
+                          })
+                        }
+                        fullWidth
+                      >
+                        {fieldTypes.map((type) => (
+                          <MenuItem key={type} value={type}>
+                            {t(`trades.schemaEditor.fieldTypes.${type}`)}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        select
+                        label={t('trades.schemaEditor.fields.required')}
+                        value={field.required ? 'true' : 'false'}
+                        onChange={(event) =>
+                          updateField(index, {
+                            required: event.target.value === 'true',
+                          })
+                        }
+                        fullWidth
+                      >
+                        <MenuItem value="false">{t('common.no')}</MenuItem>
+                        <MenuItem value="true">{t('common.yes')}</MenuItem>
+                      </TextField>
+
+                      <IconButton
+                        aria-label={t('trades.schemaEditor.removeField')}
+                        onClick={() => removeField(index)}
+                      >
+                        <DeleteOutlineOutlinedIcon />
+                      </IconButton>
+                    </Stack>
+
+                    <If condition={field.type === 'number'}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                        <TextField
+                          label={t('trades.schemaEditor.fields.min')}
+                          type="number"
+                          value={field.min ?? ''}
+                          onChange={(event) =>
+                            updateField(index, {
+                              min:
+                                event.target.value === '' ? undefined : Number(event.target.value),
+                            })
+                          }
+                          fullWidth
+                        />
+
+                        <TextField
+                          label={t('trades.schemaEditor.fields.max')}
+                          type="number"
+                          value={field.max ?? ''}
+                          onChange={(event) =>
+                            updateField(index, {
+                              max:
+                                event.target.value === '' ? undefined : Number(event.target.value),
+                            })
+                          }
+                          fullWidth
+                        />
+                      </Stack>
+                    </If>
+
+                    <If condition={field.type === 'enum'}>
+                      <TextField
+                        label={t('trades.schemaEditor.fields.values')}
+                        value={(field.values ?? []).join(', ')}
+                        helperText={t('trades.schemaEditor.valuesHelp')}
+                        onChange={(event) =>
+                          updateField(index, {
+                            values: event.target.value
+                              .split(',')
+                              .map((value) => value.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                        fullWidth
+                      />
+                    </If>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          </If>
 
           <AppButton
             label={t('trades.schemaEditor.addField')}
             variant="outlined"
-            onClick={() => undefined}
+            onClick={addField}
           />
         </Stack>
       </DialogContent>
 
       <DialogActions>
         <AppButton label={t('trades.schemaEditor.cancel')} variant="text" onClick={onClose} />
-        <AppButton label={t('trades.schemaEditor.save')} onClick={() => undefined} />
+        <AppButton
+          label={t('trades.schemaEditor.save')}
+          onClick={save}
+          disabled={saving || validationError !== null}
+        />{' '}
       </DialogActions>
     </Dialog>
   );

@@ -4,6 +4,7 @@ import {
   Chip,
   Paper,
   Skeleton,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../services/api.service';
 import { listTrades, TradeConfigResponse } from '../services/trades.service';
@@ -38,6 +39,7 @@ export function TradesPage(): JSX.Element {
   const [trades, setTrades] = useState<TradeConfigResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<TradeConfigResponse | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listTrades()
@@ -47,6 +49,24 @@ export function TradesPage(): JSX.Element {
         setError(message);
       });
   }, [t]);
+
+  const updateTrade = useCallback(
+    (updatedTrade: TradeConfigResponse): void => {
+      setTrades(
+        (current) =>
+          current?.map((trade) => (trade.trade === updatedTrade.trade ? updatedTrade : trade)) ??
+          null,
+      );
+
+      setSelectedTrade(null);
+      setSuccessMessage(t('trades.schemaEditor.saveSuccess'));
+    },
+    [t],
+  );
+
+  const closeSuccessMessage = useCallback((): void => {
+    setSuccessMessage(null);
+  }, []);
 
   if (error) {
     return <Alert severity="error">{error}</Alert>;
@@ -112,11 +132,7 @@ export function TradesPage(): JSX.Element {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" color="text.secondary">
-                        {countSchemaFields(trade.metadata)}
-                      </Typography>
-                    </TableCell>
+                    <TableCell align="right">{countSchemaFields(trade.pricingSchema)}</TableCell>
                     <TableCell align="right">
                       <AppButton
                         label={t('trades.actions.editSchema')}
@@ -137,7 +153,18 @@ export function TradesPage(): JSX.Element {
         trade={selectedTrade}
         open={selectedTrade !== null}
         onClose={() => setSelectedTrade(null)}
+        onSaved={updateTrade}
       />
+      <Snackbar
+        open={successMessage !== null}
+        autoHideDuration={2000}
+        onClose={closeSuccessMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" onClose={closeSuccessMessage}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
 
       {/*
         TODO (candidate): per-trade detail / edit view goes here. Suggested:
@@ -155,10 +182,12 @@ export function TradesPage(): JSX.Element {
  *
  * Exported for testing — see TradesPage.spec.ts.
  */
-export function countSchemaFields(metadata: Record<string, unknown>): number {
-  const schema = metadata?.pricingSchema as { fields?: unknown[] } | undefined;
+function countSchemaFields(pricingSchema: unknown): number {
+  const schema = pricingSchema as { fields?: unknown[] } | null | undefined;
+
   if (!schema || !Array.isArray(schema.fields)) {
     return 0;
   }
+
   return schema.fields.length;
 }

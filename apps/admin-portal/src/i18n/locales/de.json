@@ -8,6 +8,10 @@
       "forbidden": "Du hast keinen Zugriff."
     }
   },
+  "common": {
+    "yes": "Ja",
+    "no": "Nein"
+  },
   "nav": {
     "trades": "Trade-Konfiguration",
     "craftsmen": "Craftsmen",
@@ -48,8 +52,31 @@
       "heading": "Schema für {{trade}}",
       "emptyState": "Noch keine Schema-Felder konfiguriert.",
       "addField": "Feld hinzufügen",
+      "removeField": "Feld entfernen",
+      "saveSuccess": "Schema wurde erfolgreich gespeichert.",
       "save": "Speichern",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "valuesHelp": "Kommagetrennte Werte, z. B. small, medium, large",
+      "fields": {
+        "name": "Name",
+        "type": "Typ",
+        "required": "Pflichtfeld",
+        "min": "Minimum",
+        "max": "Maximum",
+        "values": "Erlaubte Werte"
+      },
+      "fieldTypes": {
+        "string": "Text",
+        "number": "Zahl",
+        "boolean": "Ja/Nein",
+        "enum": "Auswahl"
+      },
+      "validation": {
+        "emptyName": "Feldnamen dürfen nicht leer sein.",
+        "duplicateName": "Feldnamen dürfen nicht doppelt vorkommen.",
+        "invalidNumberRange": "Minimum darf nicht größer als Maximum sein.",
+        "emptyEnumValues": "Enum-Felder benötigen mindestens einen erlaubten Wert."
+      }
     },
     "schemaPlaceholder": "Für diese Trade-Kategorie ist noch kein Preis-Schema konfiguriert.",
     "schemaPropertyNames": {
