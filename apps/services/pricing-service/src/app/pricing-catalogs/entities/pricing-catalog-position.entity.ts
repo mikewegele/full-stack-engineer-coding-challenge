@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -25,6 +26,7 @@ export class PricingCatalogPosition {
   @ManyToOne(() => PricingCatalogVersion, (version) => version.positions, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'version_id' })
   version: PricingCatalogVersion;
 
   @Column({ type: 'varchar', length: 128 })
