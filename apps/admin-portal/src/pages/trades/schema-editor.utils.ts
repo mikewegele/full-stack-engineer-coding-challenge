@@ -1,9 +1,13 @@
 import { PricingSchemaField } from '../../services/trades.service';
 
-export type SchemaEditorValidationResult = {
-  valid: boolean;
-  messageKey?: string;
-};
+export type SchemaEditorValidationResult =
+  | {
+      valid: true;
+    }
+  | {
+      valid: false;
+      messageKey: string;
+    };
 
 export function parseOptionalNumber(value: string): number | undefined {
   if (value.trim().length === 0) {
@@ -64,6 +68,30 @@ export function validatePricingSchemaFields(
     return {
       valid: false,
       messageKey: 'trades.schemaEditor.validation.emptyEnumValues',
+    };
+  }
+
+  const invalidDependencyField = fields.find((field) => {
+    if (!field.dependsOn) {
+      return false;
+    }
+
+    return !names.includes(field.dependsOn.field);
+  });
+
+  if (invalidDependencyField) {
+    return {
+      valid: false,
+      messageKey: 'trades.schemaEditor.validation.unknownDependencyField',
+    };
+  }
+
+  const selfDependencyField = fields.find((field) => field.dependsOn?.field === field.name.trim());
+
+  if (selfDependencyField) {
+    return {
+      valid: false,
+      messageKey: 'trades.schemaEditor.validation.selfDependencyField',
     };
   }
 

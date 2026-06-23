@@ -118,4 +118,67 @@ describe('validatePricingSchemaFields', () => {
       valid: true,
     });
   });
+
+  it('rejects dependsOn references to unknown fields', () => {
+    const fields: PricingSchemaField[] = [
+      {
+        name: 'woodTreatment',
+        type: 'string',
+        required: false,
+        dependsOn: {
+          field: 'frameMaterial',
+          equals: 'wood',
+        },
+      },
+    ];
+
+    expect(validatePricingSchemaFields(fields)).toEqual({
+      valid: false,
+      messageKey: 'trades.schemaEditor.validation.unknownDependencyField',
+    });
+  });
+
+  it('rejects dependsOn references to the same field', () => {
+    const fields: PricingSchemaField[] = [
+      {
+        name: 'frameMaterial',
+        type: 'enum',
+        required: false,
+        values: ['wood', 'plastic'],
+        dependsOn: {
+          field: 'frameMaterial',
+          equals: 'wood',
+        },
+      },
+    ];
+
+    expect(validatePricingSchemaFields(fields)).toEqual({
+      valid: false,
+      messageKey: 'trades.schemaEditor.validation.selfDependencyField',
+    });
+  });
+
+  it('accepts a valid dependsOn reference', () => {
+    const fields: PricingSchemaField[] = [
+      {
+        name: 'frameMaterial',
+        type: 'enum',
+        required: true,
+        values: ['wood', 'plastic'],
+      },
+      {
+        name: 'woodTreatment',
+        type: 'string',
+        required: true,
+        dependsOn: {
+          field: 'frameMaterial',
+          equals: 'wood',
+        },
+      },
+    ];
+
+    expect(validatePricingSchemaFields(fields)).toEqual({
+      valid: true,
+    });
+  });
 });

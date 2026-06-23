@@ -56,6 +56,8 @@
       "saveSuccess": "Schema wurde erfolgreich gespeichert.",
       "save": "Speichern",
       "cancel": "Abbrechen",
+      "moveFieldUp": "Feld nach oben verschieben",
+      "moveFieldDown": "Feld nach unten verschieben",
       "valuesHelp": "Kommagetrennte Werte, z. B. small, medium, large",
       "fields": {
         "name": "Name",
@@ -63,7 +65,10 @@
         "required": "Pflichtfeld",
         "min": "Minimum",
         "max": "Maximum",
-        "values": "Erlaubte Werte"
+        "values": "Erlaubte Werte",
+        "dependsOnField": "Abhängig von Feld",
+        "dependsOnEquals": "Aktivierender Wert",
+        "dependsOnNone": "Keine Abhängigkeit"
       },
       "fieldTypes": {
         "string": "Text",
@@ -75,7 +80,9 @@
         "emptyName": "Feldnamen dürfen nicht leer sein.",
         "duplicateName": "Feldnamen dürfen nicht doppelt vorkommen.",
         "invalidNumberRange": "Minimum darf nicht größer als Maximum sein.",
-        "emptyEnumValues": "Enum-Felder benötigen mindestens einen erlaubten Wert."
+        "emptyEnumValues": "Enum-Felder benötigen mindestens einen erlaubten Wert.",
+        "unknownDependencyField": "Die Abhängigkeit verweist auf ein unbekanntes Feld.",
+        "selfDependencyField": "Ein Feld darf nicht von sich selbst abhängen."
       }
     },
     "schemaPlaceholder": "Für diese Trade-Kategorie ist noch kein Preis-Schema konfiguriert.",

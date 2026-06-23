@@ -1,3 +1,5 @@
+import ArrowDownwardOutlinedIcon from '@mui/icons-material/ArrowDownwardOutlined';
+import ArrowUpwardOutlinedIcon from '@mui/icons-material/ArrowUpwardOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import {
   Alert,
@@ -24,11 +26,7 @@ import {
   TradeConfigResponse,
   updateTradeConfig,
 } from '../../services/trades.service';
-import {
-  parseEnumValues,
-  parseOptionalNumber,
-  validatePricingSchemaFields,
-} from './schema-editor.utils';
+import { parseEnumValues, parseOptionalNumber, validatePricingSchemaFields, } from './schema-editor.utils';
 
 interface Props {
   trade: TradeConfigResponse | null;
@@ -49,11 +47,14 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
 
   const validationError = useMemo((): string | null => {
     const validation = validatePricingSchemaFields(fields);
+
     if (validation.valid) {
       return null;
     }
+
     return t(validation.messageKey);
   }, [fields, t]);
+
   useEffect(() => {
     if (!trade) {
       setFields([]);
@@ -130,6 +131,43 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
     [updateField],
   );
 
+  const updateDependsOnField = useCallback(
+    (index: number, dependsOnField: string): void => {
+      if (!dependsOnField) {
+        updateField(index, {
+          dependsOn: undefined,
+        });
+        return;
+      }
+
+      updateField(index, {
+        dependsOn: {
+          field: dependsOnField,
+          equals: fields[index]?.dependsOn?.equals ?? '',
+        },
+      });
+    },
+    [fields, updateField],
+  );
+
+  const updateDependsOnEquals = useCallback(
+    (index: number, equals: string): void => {
+      const dependsOnField = fields[index]?.dependsOn?.field;
+
+      if (!dependsOnField) {
+        return;
+      }
+
+      updateField(index, {
+        dependsOn: {
+          field: dependsOnField,
+          equals,
+        },
+      });
+    },
+    [fields, updateField],
+  );
+
   const removeField = useCallback((index: number): void => {
     setFields((current) => current.filter((_, fieldIndex) => fieldIndex !== index));
 
@@ -145,6 +183,51 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
       ),
     );
   }, []);
+
+  const moveField = useCallback(
+    (index: number, direction: -1 | 1): void => {
+      setFields((current) => {
+        const targetIndex = index + direction;
+
+        if (targetIndex < 0 || targetIndex >= current.length) {
+          return current;
+        }
+
+        const next = [...current];
+        const [field] = next.splice(index, 1);
+        next.splice(targetIndex, 0, field);
+
+        return next;
+      });
+
+      setEnumValueInputs((current) => {
+        const targetIndex = index + direction;
+
+        if (targetIndex < 0 || targetIndex >= fields.length) {
+          return current;
+        }
+
+        const next = { ...current };
+        const currentValue = next[index];
+        const targetValue = next[targetIndex];
+
+        if (currentValue === undefined) {
+          delete next[targetIndex];
+        } else {
+          next[targetIndex] = currentValue;
+        }
+
+        if (targetValue === undefined) {
+          delete next[index];
+        } else {
+          next[index] = targetValue;
+        }
+
+        return next;
+      });
+    },
+    [fields.length],
+  );
 
   const save = useCallback(async (): Promise<void> => {
     if (!trade) {
@@ -257,12 +340,30 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                         <MenuItem value="true">{t('common.yes')}</MenuItem>
                       </TextField>
 
-                      <IconButton
-                        aria-label={t('trades.schemaEditor.removeField')}
-                        onClick={() => removeField(index)}
-                      >
-                        <DeleteOutlineOutlinedIcon />
-                      </IconButton>
+                      <Stack direction="row" spacing={0.5}>
+                        <IconButton
+                          aria-label={t('trades.schemaEditor.moveFieldUp')}
+                          onClick={() => moveField(index, -1)}
+                          disabled={index === 0}
+                        >
+                          <ArrowUpwardOutlinedIcon />
+                        </IconButton>
+
+                        <IconButton
+                          aria-label={t('trades.schemaEditor.moveFieldDown')}
+                          onClick={() => moveField(index, 1)}
+                          disabled={index === fields.length - 1}
+                        >
+                          <ArrowDownwardOutlinedIcon />
+                        </IconButton>
+
+                        <IconButton
+                          aria-label={t('trades.schemaEditor.removeField')}
+                          onClick={() => removeField(index)}
+                        >
+                          <DeleteOutlineOutlinedIcon />
+                        </IconButton>
+                      </Stack>
                     </Stack>
 
                     <If condition={field.type === 'number'}>
@@ -302,6 +403,37 @@ export function SchemaEditorDialog(props: Props): JSX.Element {
                         fullWidth
                       />
                     </If>
+
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                      <TextField
+                        select
+                        label={t('trades.schemaEditor.fields.dependsOnField')}
+                        value={field.dependsOn?.field ?? ''}
+                        onChange={(event) => updateDependsOnField(index, event.target.value)}
+                        fullWidth
+                      >
+                        <MenuItem value="">
+                          {t('trades.schemaEditor.fields.dependsOnNone')}
+                        </MenuItem>
+
+                        {fields
+                          .filter((candidate, candidateIndex) => candidateIndex !== index)
+                          .filter((candidate) => candidate.name.trim().length > 0)
+                          .map((candidate) => (
+                            <MenuItem key={candidate.name} value={candidate.name}>
+                              {candidate.name}
+                            </MenuItem>
+                          ))}
+                      </TextField>
+
+                      <TextField
+                        label={t('trades.schemaEditor.fields.dependsOnEquals')}
+                        value={field.dependsOn?.equals ?? ''}
+                        onChange={(event) => updateDependsOnEquals(index, event.target.value)}
+                        disabled={!field.dependsOn?.field}
+                        fullWidth
+                      />
+                    </Stack>
                   </Stack>
                 </Paper>
               ))}

@@ -56,6 +56,8 @@
       "saveSuccess": "Schema was saved successfully.",
       "save": "Save",
       "cancel": "Cancel",
+      "moveFieldUp": "Move field up",
+      "moveFieldDown": "Move field down",
       "valuesHelp": "Comma-separated values, e.g. small, medium, large",
       "fields": {
         "name": "Name",
@@ -63,7 +65,10 @@
         "required": "Required",
         "min": "Minimum",
         "max": "Maximum",
-        "values": "Allowed values"
+        "values": "Allowed values",
+        "dependsOnField": "Depends on field",
+        "dependsOnEquals": "Activating value",
+        "dependsOnNone": "No dependency"
       },
       "fieldTypes": {
         "string": "Text",
@@ -75,7 +80,9 @@
         "emptyName": "Field names must not be empty.",
         "duplicateName": "Field names must be unique.",
         "invalidNumberRange": "Minimum must not be greater than maximum.",
-        "emptyEnumValues": "Enum fields require at least one allowed value."
+        "emptyEnumValues": "Enum fields require at least one allowed value.",
+        "unknownDependencyField": "The dependency references an unknown field.",
+        "selfDependencyField": "A field must not depend on itself."
       }
     },
     "schemaPlaceholder": "No pricing schema has been configured for this trade yet.",
