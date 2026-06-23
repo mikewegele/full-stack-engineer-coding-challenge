@@ -224,6 +224,42 @@ export class PricingCatalogsService {
     return PricingCatalogResponseDto.from(saved);
   }
 
+  async publish(versionId: string, user: JwtPayload): Promise<PricingCatalogResponseDto> {
+    const published = await this.versions.manager.transaction(async (manager) => {
+      const version = await manager.findOne(PricingCatalogVersion, {
+        where: { id: versionId },
+        relations: ['positions', 'positions.surcharges', 'discounts'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!version) {
+        throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
+      }
+      this.assertCanAccess(version.craftsmanId, user);
+      if (version.status !== PricingCatalogStatus.DRAFT) {
+        throw new BadRequestException('Only draft pricing catalogs can be published');
+      }
+      const existingPublished = await manager.findOne(PricingCatalogVersion, {
+        where: {
+          craftsmanId: version.craftsmanId,
+          trade: version.trade,
+          status: PricingCatalogStatus.PUBLISHED,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (existingPublished) {
+        throw new BadRequestException(
+          `A published pricing catalog already exists for craftsman ${version.craftsmanId} and trade ${version.trade}`,
+        );
+      }
+      version.status = PricingCatalogStatus.PUBLISHED;
+      version.publishedAt = new Date();
+      version.publishedByUserId = user.sub;
+      return manager.save(PricingCatalogVersion, version);
+    });
+
+    return PricingCatalogResponseDto.from(published);
+  }
+
   // ---------------------------------------------------------------------
   // Private helper methods
   // ---------------------------------------------------------------------

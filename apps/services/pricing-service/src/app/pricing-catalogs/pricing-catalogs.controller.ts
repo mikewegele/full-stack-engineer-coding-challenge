@@ -87,4 +87,18 @@ export class PricingCatalogsController {
   ): Promise<QuoteResult> {
     return this.service.quoteVersion(versionId, dto, user);
   }
+
+  @Post(':versionId/publish')
+  @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
+  @ApiOperation({ summary: 'Publish a draft pricing catalog version' })
+  @ApiResponse({ status: 200, type: PricingCatalogResponseDto })
+  @ApiResponse({ status: 400, description: 'Only draft pricing catalogs can be published' })
+  @ApiResponse({ status: 403, description: 'Caller may not publish this pricing catalog' })
+  @ApiResponse({ status: 404, description: 'Pricing catalog version not found' })
+  publish(
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PricingCatalogResponseDto> {
+    return this.service.publish(versionId, user);
+  }
 }

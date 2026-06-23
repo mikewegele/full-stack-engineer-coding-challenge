@@ -621,4 +621,111 @@ describe('PricingCatalogsService', () => {
       );
     });
   });
+
+  describe('publish', () => {
+    let manager: {
+      findOne: jest.Mock;
+      save: jest.Mock;
+    };
+
+    beforeEach(() => {
+      manager = {
+        findOne: jest.fn(),
+        save: jest.fn().mockImplementation((_entity, version: PricingCatalogVersion) =>
+          Promise.resolve({
+            ...version,
+            updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+          }),
+        ),
+      };
+
+      Object.assign(repo, {
+        manager: {
+          transaction: jest.fn().mockImplementation((callback) => callback(manager)),
+        },
+      });
+    });
+
+    it('publishes a draft pricing catalog', async () => {
+      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(null);
+
+      const result = await service.publish('version-id', adminUser);
+
+      expect(result.status).toBe(PricingCatalogStatus.PUBLISHED);
+
+      expect(manager.save).toHaveBeenCalledWith(
+        PricingCatalogVersion,
+        expect.objectContaining({
+          id: 'version-id',
+          status: PricingCatalogStatus.PUBLISHED,
+          publishedByUserId: 'admin-id',
+        }),
+      );
+
+      const savedVersion = manager.save.mock.calls[0][1] as PricingCatalogVersion;
+      expect(savedVersion.publishedAt).toBeInstanceOf(Date);
+    });
+
+    it('throws NotFoundException when version does not exist', async () => {
+      manager.findOne.mockResolvedValueOnce(null);
+
+      await expect(service.publish('missing-id', adminUser)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when CRAFTSMAN publishes another catalog', async () => {
+      manager.findOne.mockResolvedValueOnce(buildVersion());
+
+      await expect(service.publish('version-id', otherCraftsmanUser)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when version is already published', async () => {
+      manager.findOne.mockResolvedValueOnce(
+        buildVersion({
+          status: PricingCatalogStatus.PUBLISHED,
+          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+          publishedByUserId: 'admin-id',
+        }),
+      );
+
+      await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when another published version already exists', async () => {
+      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(
+        buildVersion({
+          id: 'published-version-id',
+          status: PricingCatalogStatus.PUBLISHED,
+          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+          publishedByUserId: 'admin-id',
+        }),
+      );
+
+      await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('allows CRAFTSMAN to publish their own draft', async () => {
+      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(null);
+
+      const result = await service.publish('version-id', craftsmanUser);
+
+      expect(result.status).toBe(PricingCatalogStatus.PUBLISHED);
+      expect(manager.save).toHaveBeenCalled();
+    });
+  });
 });
