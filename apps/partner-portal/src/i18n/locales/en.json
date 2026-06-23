@@ -95,7 +95,34 @@
       "validation": {
         "invalidNumber": "Enter a valid number.",
         "min": "The value must be at least {{min}}.",
-        "max": "The value must be at most {{max}}."
+        "max": "The value must be at most {{max}}.",
+        "integer": "Enter a whole number."
+      }
+    },
+    "quote": {
+      "open": "Calculate quote preview",
+      "title": "Calculate quote preview",
+      "close": "Close",
+      "calculate": "Calculate",
+      "calculating": "Calculating…",
+      "empty": "This published catalog does not contain any positions.",
+      "fields": {
+        "position": "Position",
+        "quantity": "Quantity"
+      },
+      "messages": {
+        "failed": "Could not calculate quote preview."
+      },
+      "result": {
+        "title": "Result",
+        "subtotalNet": "Subtotal net",
+        "surcharge": "Surcharges",
+        "discount": "Discounts",
+        "totalNet": "Total net",
+        "vat": "VAT",
+        "totalGross": "Total gross",
+        "lines": "Lines",
+        "lineSummary": "{{quantity}} × net {{net}}, gross {{gross}}"
       }
     }
   },

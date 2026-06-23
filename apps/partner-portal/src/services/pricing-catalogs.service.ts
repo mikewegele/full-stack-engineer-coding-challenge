@@ -68,6 +68,51 @@ export type UpdatePricingCatalogPositionRequest = Omit<
   attributes?: Record<string, unknown>;
 };
 
+export type QuoteRequest = components['schemas']['QuoteRequestDto'];
+
+export type QuoteAppliedSurcharge = {
+  key: string;
+  label: string;
+  amountCents: number;
+};
+
+export type QuoteAppliedDiscount = {
+  key: string;
+  label: string;
+  amountCents: number;
+};
+
+export type QuoteLine = {
+  positionKey: string;
+  label: string;
+  quantity: number;
+  vatRate: string;
+  netCents: number;
+  grossCents: number;
+  appliedSurcharges: QuoteAppliedSurcharge[];
+  appliedDiscounts: QuoteAppliedDiscount[];
+};
+
+export type QuoteVatBreakdown = {
+  vatRate: string;
+  netCents: number;
+  vatCents: number;
+  grossCents: number;
+};
+
+export type QuoteTotals = {
+  netCents: number;
+  discountCents: number;
+  vatCents: number;
+  grossCents: number;
+};
+
+export type QuoteResult = {
+  lines: QuoteLine[];
+  vatBreakdown: QuoteVatBreakdown[];
+  totals: QuoteTotals;
+};
+
 export function listTrades(): Promise<TradeConfigResponse[]> {
   return apiClient.get<TradeConfigResponse[]>('/trades').then((response) => response.data);
 }
@@ -106,5 +151,14 @@ export function updatePricingCatalog(
 export function publishPricingCatalog(versionId: string): Promise<PricingCatalogVersionResponse> {
   return apiClient
     .post<PricingCatalogVersionResponse>(`/pricing-catalogs/${versionId}/publish`)
+    .then((response) => response.data);
+}
+
+export function createPricingCatalogQuote(
+  versionId: string,
+  payload: QuoteRequest,
+): Promise<QuoteResult> {
+  return apiClient
+    .post<QuoteResult>(`/pricing-catalogs/${versionId}/quote`, payload)
     .then((response) => response.data);
 }

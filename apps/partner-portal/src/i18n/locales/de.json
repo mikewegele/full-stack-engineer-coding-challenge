@@ -95,7 +95,34 @@
       "validation": {
         "invalidNumber": "Bitte gib eine gültige Zahl ein.",
         "min": "Der Wert muss mindestens {{min}} sein.",
-        "max": "Der Wert darf höchstens {{max}} sein."
+        "max": "Der Wert darf höchstens {{max}} sein.",
+        "integer": "Bitte gib eine ganze Zahl ein."
+      }
+    },
+    "quote": {
+      "open": "Kostenvorschau berechnen",
+      "title": "Kostenvorschau berechnen",
+      "close": "Schließen",
+      "calculate": "Berechnen",
+      "calculating": "Wird berechnet …",
+      "empty": "Für diesen veröffentlichten Katalog sind keine Positionen vorhanden.",
+      "fields": {
+        "position": "Position",
+        "quantity": "Menge"
+      },
+      "messages": {
+        "failed": "Kostenvorschau konnte nicht berechnet werden."
+      },
+      "result": {
+        "title": "Ergebnis",
+        "subtotalNet": "Zwischensumme netto",
+        "surcharge": "Zuschläge",
+        "discount": "Rabatte",
+        "totalNet": "Gesamt netto",
+        "vat": "MwSt.",
+        "totalGross": "Gesamt brutto",
+        "lines": "Positionen",
+        "lineSummary": "{{quantity}} × netto {{net}}, brutto {{gross}}"
       }
     }
   },

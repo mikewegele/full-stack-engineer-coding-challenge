@@ -33,6 +33,7 @@ import {
   UpdatePricingCatalogPositionRequest,
 } from '../services/pricing-catalogs.service';
 import { PricingCatalogPositionDialog } from './PricingCatalogPositionDialog';
+import { PricingCatalogQuoteDialog } from './PricingCatalogQuoteDialog';
 import { mapCatalogToTableRows } from './pricing-catalog.utils';
 
 type CatalogsByTrade = Record<string, PricingCatalogVersionResponse[]>;
@@ -108,6 +109,7 @@ export function PricingCatalogPage(): JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
   const [positionDialogOpen, setPositionDialogOpen] = useState(false);
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [savingPosition, setSavingPosition] = useState(false);
   const [publishingDraft, setPublishingDraft] = useState(false);
   const [snack, setSnack] = useState<{ severity: 'success' | 'error'; message: string } | null>(
@@ -384,7 +386,11 @@ export function PricingCatalogPage(): JSX.Element {
           )}
 
           {published ? (
-            <CatalogPositionsTable catalog={published} title={t('pricing.sections.published')} />
+            <CatalogPositionsTable
+              catalog={published}
+              title={t('pricing.sections.published')}
+              onQuote={() => setQuoteDialogOpen(true)}
+            />
           ) : null}
         </Stack>
       </Paper>
@@ -395,6 +401,13 @@ export function PricingCatalogPage(): JSX.Element {
         onClose={() => setPositionDialogOpen(false)}
         onSave={savePosition}
         saving={savingPosition}
+      />
+
+      <PricingCatalogQuoteDialog
+        open={quoteDialogOpen}
+        catalog={published}
+        fields={selectedTradeConfig?.pricingSchema?.fields ?? []}
+        onClose={() => setQuoteDialogOpen(false)}
       />
 
       <Snackbar
@@ -419,8 +432,9 @@ function CatalogPositionsTable(props: {
   publishing?: boolean;
   onAddPosition?: () => void;
   onPublish?: () => void;
+  onQuote?: () => void;
 }): JSX.Element {
-  const { catalog, title, publishing = false, onAddPosition, onPublish } = props;
+  const { catalog, title, publishing = false, onAddPosition, onPublish, onQuote } = props;
   const { t } = useTranslation();
   const rows = mapCatalogToTableRows(catalog);
   const canEdit = !!onAddPosition && !!onPublish;
@@ -451,6 +465,11 @@ function CatalogPositionsTable(props: {
                   {publishing ? t('pricing.publishing') : t('pricing.publish')}
                 </Button>
               </>
+            ) : null}
+            {onQuote ? (
+              <Button variant="outlined" size="small" onClick={onQuote}>
+                {t('pricing.quote.open')}
+              </Button>
             ) : null}
             <Chip label={catalog.status} />
           </Stack>
