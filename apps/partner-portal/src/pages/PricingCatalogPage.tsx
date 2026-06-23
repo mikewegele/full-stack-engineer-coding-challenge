@@ -7,6 +7,11 @@ import {
   Skeleton,
   Stack,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   Tabs,
   Typography,
 } from '@mui/material';
@@ -20,8 +25,10 @@ import {
   listPricingCatalogs,
   listTrades,
   PricingCatalogVersionResponse,
+  TradeCode,
   TradeConfigResponse,
 } from '../services/pricing-catalogs.service';
+import { mapCatalogToTableRows } from './pricing-catalog.utils';
 
 type CatalogsByTrade = Record<string, PricingCatalogVersionResponse[]>;
 
@@ -43,6 +50,21 @@ function formatDate(value: string | null): string {
   }
 
   return new Intl.DateTimeFormat('de-DE').format(new Date(value));
+}
+
+function formatCents(value: number): string {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(value / 100);
+}
+
+function formatVatRate(value: string): string {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'percent',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Number(value));
 }
 
 export function PricingCatalogPage(): JSX.Element {
@@ -75,7 +97,9 @@ export function PricingCatalogPage(): JSX.Element {
   const published = findPublished(selectedCatalogs);
 
   const load = useCallback(async (): Promise<void> => {
-    if (!user?.craftsmanId) {
+    const userCraftsmanId = user?.craftsmanId;
+
+    if (!userCraftsmanId) {
       setLoading(false);
       return;
     }
@@ -85,7 +109,7 @@ export function PricingCatalogPage(): JSX.Element {
 
     try {
       const [craftsmanResult, tradesResult] = await Promise.all([
-        fetchCraftsman(user.craftsmanId),
+        fetchCraftsman(userCraftsmanId),
         listTrades(),
       ]);
 
@@ -95,7 +119,8 @@ export function PricingCatalogPage(): JSX.Element {
 
       const catalogEntries = await Promise.all(
         assignedTradeConfigs.map(async (trade) => {
-          const catalogs = await listPricingCatalogs(craftsmanResult.id, trade.trade);
+          const catalogs = await listPricingCatalogs(craftsmanResult.id, trade.trade as TradeCode);
+
           return [trade.trade, catalogs] as const;
         }),
       );
@@ -121,12 +146,15 @@ export function PricingCatalogPage(): JSX.Element {
       return;
     }
 
+    const trade = selectedTrade as TradeCode;
+
     setCreatingDraft(true);
+    setLoadError(null);
 
     try {
       const created = await createPricingCatalog({
         craftsmanId: craftsman.id,
-        trade: selectedTrade,
+        trade,
         effectiveFrom: new Date().toISOString(),
       });
 
@@ -220,10 +248,7 @@ export function PricingCatalogPage(): JSX.Element {
             </Stack>
 
             <Stack direction="row" spacing={1}>
-              <Chip
-                label={draft ? t('pricing.status.hasDraft') : t('pricing.status.noDraft')}
-                color={draft ? 'primary' : 'default'}
-              />
+              <Chip label={draft ? t('pricing.status.hasDraft') : t('pricing.status.noDraft')} />
               <Chip
                 label={
                   published ? t('pricing.status.hasPublished') : t('pricing.status.noPublished')
@@ -233,7 +258,7 @@ export function PricingCatalogPage(): JSX.Element {
           </Stack>
 
           {draft ? (
-            <CatalogSummary catalog={draft} title={t('pricing.sections.draft')} />
+            <CatalogPositionsTable catalog={draft} title={t('pricing.sections.draft')} />
           ) : (
             <Paper variant="outlined" sx={{ p: 3 }}>
               <Stack spacing={2} alignItems="flex-start">
@@ -256,6 +281,61 @@ export function PricingCatalogPage(): JSX.Element {
         </Stack>
       </Paper>
     </Stack>
+  );
+}
+
+function CatalogPositionsTable(props: {
+  catalog: PricingCatalogVersionResponse;
+  title: string;
+}): JSX.Element {
+  const { catalog, title } = props;
+  const { t } = useTranslation();
+  const rows = mapCatalogToTableRows(catalog);
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
+          <Stack spacing={0.5}>
+            <Typography variant="h3">{title}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t('pricing.effectiveFrom', { date: formatDate(catalog.effectiveFrom) })}
+            </Typography>
+          </Stack>
+
+          <Chip label={catalog.status} />
+        </Stack>
+
+        {rows.length === 0 ? (
+          <Alert severity="info">{t('pricing.empty.noPositions')}</Alert>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t('pricing.positions.key')}</TableCell>
+                <TableCell>{t('pricing.positions.label')}</TableCell>
+                <TableCell>{t('pricing.positions.unit')}</TableCell>
+                <TableCell align="right">{t('pricing.positions.netPrice')}</TableCell>
+                <TableCell align="right">{t('pricing.positions.vatRate')}</TableCell>
+                <TableCell>{t('pricing.positions.attributes')}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.key}>
+                  <TableCell>{row.key}</TableCell>
+                  <TableCell>{row.label}</TableCell>
+                  <TableCell>{row.unit}</TableCell>
+                  <TableCell align="right">{formatCents(row.netPriceCents)}</TableCell>
+                  <TableCell align="right">{formatVatRate(row.vatRate)}</TableCell>
+                  <TableCell>{row.attributesSummary}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Stack>
+    </Paper>
   );
 }
 

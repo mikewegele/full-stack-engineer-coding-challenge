@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { PricingAdjustmentType } from './pricing-catalog.enums';
 import { PricingCatalogVersion } from './pricing-catalog-version.entity';
@@ -6,7 +6,6 @@ import { PricingCatalogVersion } from './pricing-catalog-version.entity';
 export type DiscountAppliesTo = 'subtotal' | { positionKeys: string[] };
 
 @Entity({ schema: 'pricing_service', name: 'pricing_catalog_discounts' })
-@Index(['versionId', 'key'], { unique: true })
 export class PricingCatalogDiscount {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -17,6 +16,7 @@ export class PricingCatalogDiscount {
   @ManyToOne(() => PricingCatalogVersion, (version) => version.discounts, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'version_id' })
   version: PricingCatalogVersion;
 
   @Column({ type: 'varchar', length: 128 })

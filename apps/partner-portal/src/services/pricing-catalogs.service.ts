@@ -1,8 +1,11 @@
 import { apiClient } from './api.service';
+import { components } from './generated/pricing-api.types';
 
-export type PricingCatalogStatus = 'DRAFT' | 'PUBLISHED';
+export type TradeCode = components['schemas']['CreatePricingCatalogDto']['trade'];
 
-export type PricingUnit = 'piece' | 'm2' | 'meter' | 'hour' | 'flat';
+export type PricingCatalogStatus = components['schemas']['PricingCatalogResponseDto']['status'];
+
+export type PricingUnit = components['schemas']['PricingCatalogPositionResponseDto']['unit'];
 
 export type PricingSchemaFieldType = 'string' | 'number' | 'boolean' | 'enum';
 
@@ -25,40 +28,31 @@ export type PricingSchema = {
   fields: PricingSchemaField[];
 };
 
-export type TradeConfigResponse = {
-  id: string;
-  trade: string;
-  displayName: string;
+export type TradeConfigResponse = Omit<
+  components['schemas']['TradeConfigResponseDto'],
+  'pricingSchema'
+> & {
   pricingSchema: PricingSchema;
 };
 
-export type PricingCatalogPositionResponse = {
-  id: string;
-  key: string;
-  label: string;
-  unit: PricingUnit;
-  netPriceCents: number;
-  vatRate: string;
+export type PricingCatalogPositionResponse = Omit<
+  components['schemas']['PricingCatalogPositionResponseDto'],
+  'attributes' | 'minQuantity' | 'maxQuantity'
+> & {
+  attributes: Record<string, unknown>;
   minQuantity: string | null;
   maxQuantity: string | null;
-  attributes: Record<string, unknown>;
 };
 
-export type PricingCatalogVersionResponse = {
-  id: string;
-  craftsmanId: string;
-  trade: string;
-  status: PricingCatalogStatus;
-  effectiveFrom: string;
+export type PricingCatalogVersionResponse = Omit<
+  components['schemas']['PricingCatalogResponseDto'],
+  'positions' | 'publishedAt'
+> & {
   publishedAt: string | null;
   positions: PricingCatalogPositionResponse[];
 };
 
-export type CreatePricingCatalogRequest = {
-  craftsmanId: string;
-  trade: string;
-  effectiveFrom: string;
-};
+export type CreatePricingCatalogRequest = components['schemas']['CreatePricingCatalogDto'];
 
 export function listTrades(): Promise<TradeConfigResponse[]> {
   return apiClient.get<TradeConfigResponse[]>('/trades').then((response) => response.data);
@@ -66,7 +60,7 @@ export function listTrades(): Promise<TradeConfigResponse[]> {
 
 export function listPricingCatalogs(
   craftsmanId: string,
-  trade: string,
+  trade: TradeCode,
 ): Promise<PricingCatalogVersionResponse[]> {
   return apiClient
     .get<PricingCatalogVersionResponse[]>('/pricing-catalogs', {

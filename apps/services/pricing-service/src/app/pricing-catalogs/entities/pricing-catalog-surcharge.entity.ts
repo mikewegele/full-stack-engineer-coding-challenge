@@ -1,10 +1,9 @@
-import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
-import { PricingAdjustmentType } from './pricing-catalog.enums';
 import { PricingCatalogPosition } from './pricing-catalog-position.entity';
+import { PricingAdjustmentType } from './pricing-catalog.enums';
 
 @Entity({ schema: 'pricing_service', name: 'pricing_catalog_surcharges' })
-@Index(['positionId', 'key'], { unique: true })
 export class PricingCatalogSurcharge {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -15,6 +14,7 @@ export class PricingCatalogSurcharge {
   @ManyToOne(() => PricingCatalogPosition, (position) => position.surcharges, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'position_id' })
   position: PricingCatalogPosition;
 
   @Column({ type: 'varchar', length: 128 })

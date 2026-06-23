@@ -49,11 +49,20 @@
       "noTrades": "No trade categories are assigned to you yet.",
       "noDraftTitle": "No draft yet",
       "noDraftFromPublished": "Start a new draft to edit the active catalog.",
-      "noDraftEmpty": "Start an empty draft to create your first pricing catalog."
+      "noDraftEmpty": "Start an empty draft to create your first pricing catalog.",
+      "noPositions": "This draft does not contain any positions yet."
     },
     "messages": {
       "loadFailed": "Could not load pricing catalog.",
       "createDraftFailed": "Could not create draft."
+    },
+    "positions": {
+      "key": "Key",
+      "label": "Label",
+      "unit": "Unit",
+      "netPrice": "Net price",
+      "vatRate": "VAT",
+      "attributes": "Attributes"
     }
   },
   "profile": {

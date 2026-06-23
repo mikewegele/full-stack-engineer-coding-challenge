@@ -49,11 +49,20 @@
       "noTrades": "Dir sind noch keine Trade-Kategorien zugeordnet.",
       "noDraftTitle": "Noch keine Draft vorhanden",
       "noDraftFromPublished": "Starte eine neue Draft, um den aktiven Katalog zu bearbeiten.",
-      "noDraftEmpty": "Starte eine leere Draft, um Deinen ersten Preiskatalog anzulegen."
+      "noDraftEmpty": "Starte eine leere Draft, um Deinen ersten Preiskatalog anzulegen.",
+      "noPositions": "Diese Draft enthält noch keine Positionen."
     },
     "messages": {
       "loadFailed": "Preiskatalog konnte nicht geladen werden.",
       "createDraftFailed": "Draft konnte nicht erstellt werden."
+    },
+    "positions": {
+      "key": "Key",
+      "label": "Bezeichnung",
+      "unit": "Einheit",
+      "netPrice": "Nettopreis",
+      "vatRate": "MwSt.",
+      "attributes": "Attribute"
     }
   },
   "profile": {

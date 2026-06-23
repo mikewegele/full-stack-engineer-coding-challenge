@@ -1,14 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import { TRADE_CODES, TradeCode } from '@sandbox/types';
 
 export class QueryPricingCatalogsDto {
-  @ApiProperty({ required: false, description: 'Filter by craftsman id' })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   craftsmanId?: string;
 
-  @ApiProperty({ required: false, enum: TRADE_CODES })
   @IsOptional()
   @IsIn(TRADE_CODES)
   trade?: TradeCode;
