@@ -182,7 +182,7 @@ export function TradesPage(): JSX.Element {
  *
  * Exported for testing — see TradesPage.spec.ts.
  */
-function countSchemaFields(pricingSchema: unknown): number {
+export function countSchemaFields(pricingSchema: unknown): number {
   const schema = pricingSchema as { fields?: unknown[] } | null | undefined;
 
   if (!schema || !Array.isArray(schema.fields)) {
