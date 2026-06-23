@@ -12,12 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '@sandbox/auth';
 import { JwtPayload, PaginatedResponse, UserRole } from '@sandbox/types';
 
@@ -26,13 +21,19 @@ import { CreateCraftsmanDto } from './dto/create-craftsman.dto';
 import { UpdateCraftsmanDto } from './dto/update-craftsman.dto';
 import { QueryCraftsmenDto } from './dto/query-craftsmen.dto';
 import { CraftsmanResponseDto } from './dto/craftsman-response.dto';
+import { QuoteRequestDto } from '../pricing-catalogs/dto/quote-request.dto';
+import { QuoteResult } from '../pricing-catalogs/quote/quote.types';
+import { PricingCatalogsService } from '../pricing-catalogs/pricing-catalogs.service';
 
 @ApiTags('Craftsmen')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('craftsmen')
 export class CraftsmenController {
-  constructor(private readonly service: CraftsmenService) {}
+  constructor(
+    private readonly service: CraftsmenService,
+    private readonly pricingCatalogsService: PricingCatalogsService,
+  ) {}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
@@ -86,10 +87,23 @@ export class CraftsmenController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a craftsman' })
   @ApiResponse({ status: 204 })
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ): Promise<void> {
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload): Promise<void> {
     return this.service.remove(id, user);
+  }
+
+  @Post(':id/trades/:trade/quote')
+  @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
+  @ApiOperation({ summary: 'Calculate a quote for the active published pricing catalog' })
+  @ApiResponse({ status: 200, description: 'Calculated quote breakdown' })
+  @ApiResponse({ status: 400, description: 'Quote request is invalid' })
+  @ApiResponse({ status: 403, description: 'Caller may not quote this craftsman' })
+  @ApiResponse({ status: 404, description: 'Active published pricing catalog not found' })
+  quoteActiveCatalog(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('trade') trade: string,
+    @Body() dto: QuoteRequestDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<QuoteResult> {
+    return this.pricingCatalogsService.quoteActiveVersion(id, trade, dto, user);
   }
 }

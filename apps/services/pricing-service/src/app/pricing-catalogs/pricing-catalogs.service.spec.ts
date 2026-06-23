@@ -728,4 +728,154 @@ describe('PricingCatalogsService', () => {
       expect(manager.save).toHaveBeenCalled();
     });
   });
+
+  describe('quoteActiveVersion', () => {
+    it('quotes the active published catalog for a craftsman and trade', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(buildAssignment());
+      const version = buildVersion({
+        status: PricingCatalogStatus.PUBLISHED,
+      });
+      const position = {
+        id: 'position-id',
+        versionId: 'version-id',
+        version,
+        key: 'install',
+        label: 'Installation',
+        unit: PricingUnit.PIECE,
+        netPriceCents: 10000,
+        vatRate: '0.19',
+        minQuantity: null,
+        maxQuantity: null,
+        attributes: {},
+        surcharges: [],
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      } as PricingCatalogPosition;
+      version.positions = [position];
+
+      repo.findOne!.mockResolvedValue(version);
+      const result = await service.quoteActiveVersion(
+        'craftsman-a',
+        'HVAC',
+        {
+          lines: [
+            {
+              positionKey: 'install',
+              quantity: 2,
+            },
+          ],
+        },
+        adminUser,
+      );
+
+      expect(result.totals).toEqual({
+        netCents: 20000,
+        discountCents: 0,
+        vatCents: 3800,
+        grossCents: 23800,
+      });
+    });
+
+    it('throws ForbiddenException when CRAFTSMAN quotes another craftsman', async () => {
+      await expect(
+        service.quoteActiveVersion(
+          'craftsman-a',
+          'HVAC',
+          {
+            lines: [
+              {
+                positionKey: 'install',
+                quantity: 1,
+              },
+            ],
+          },
+          otherCraftsmanUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws NotFoundException when craftsman does not exist', async () => {
+      craftsmen.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.quoteActiveVersion(
+          'craftsman-a',
+          'HVAC',
+          {
+            lines: [
+              {
+                positionKey: 'install',
+                quantity: 1,
+              },
+            ],
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException when craftsman is inactive', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman({ isActive: false }));
+
+      await expect(
+        service.quoteActiveVersion(
+          'craftsman-a',
+          'HVAC',
+          {
+            lines: [
+              {
+                positionKey: 'install',
+                quantity: 1,
+              },
+            ],
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when craftsman is not assigned to the trade', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.quoteActiveVersion(
+          'craftsman-a',
+          'HVAC',
+          {
+            lines: [
+              {
+                positionKey: 'install',
+                quantity: 1,
+              },
+            ],
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFoundException when no active published catalog exists', async () => {
+      craftsmen.findOne!.mockResolvedValue(buildCraftsman());
+      assignments.findOne!.mockResolvedValue(buildAssignment());
+      repo.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.quoteActiveVersion(
+          'craftsman-a',
+          'HVAC',
+          {
+            lines: [
+              {
+                positionKey: 'install',
+                quantity: 1,
+              },
+            ],
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

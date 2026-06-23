@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload, UserRole } from '@sandbox/types';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 
 import { PricingCatalogResponseDto } from './dto/pricing-catalog-response.dto';
 import { QueryPricingCatalogsDto } from './dto/query-pricing-catalogs.dto';
@@ -96,38 +96,13 @@ export class PricingCatalogsService {
     user: JwtPayload,
   ): Promise<QuoteResult> {
     const version = await this.findVersionEntityOrFail(versionId, user);
-
     return calculateQuote(version, dto);
   }
 
   async create(dto: CreatePricingCatalogDto, user: JwtPayload): Promise<PricingCatalogResponseDto> {
     this.assertCanAccess(dto.craftsmanId, user);
-
-    const craftsman = await this.craftsmen.findOne({
-      where: { id: dto.craftsmanId },
-    });
-
-    if (!craftsman) {
-      throw new NotFoundException(`Craftsman ${dto.craftsmanId} not found`);
-    }
-    if (!craftsman.isActive) {
-      throw new BadRequestException(`Craftsman ${dto.craftsmanId} is inactive`);
-    }
-
-    const assignment = await this.assignments.findOne({
-      where: {
-        craftsmanId: dto.craftsmanId,
-        trade: dto.trade,
-        isActive: true,
-      },
-    });
-
-    if (!assignment) {
-      throw new BadRequestException(
-        `Craftsman ${dto.craftsmanId} is not assigned to trade ${dto.trade}`,
-      );
-    }
-
+    await this.assertCraftsmanIsActive(dto.craftsmanId);
+    await this.assertCraftsmanIsAssignedToTrade(dto.craftsmanId, dto.trade);
     const version = this.versions.create({
       craftsmanId: dto.craftsmanId,
       trade: dto.trade,
@@ -260,16 +235,85 @@ export class PricingCatalogsService {
     return PricingCatalogResponseDto.from(published);
   }
 
+  async quoteActiveVersion(
+    id: string,
+    trade: string,
+    dto: QuoteRequestDto,
+    user: JwtPayload,
+  ): Promise<QuoteResult> {
+    this.assertCanAccess(id, user);
+    await this.assertCraftsmanIsActive(id);
+    await this.assertCraftsmanIsAssignedToTrade(id, trade);
+    const version = await this.findActivePublishedVersionOrFail(id, trade);
+    return calculateQuote(version, dto);
+  }
+
   // ---------------------------------------------------------------------
   // Private helper methods
   // ---------------------------------------------------------------------
+
+  private async assertCraftsmanIsActive(craftsmanId: string): Promise<void> {
+    const craftsman = await this.craftsmen.findOne({
+      where: { id: craftsmanId },
+    });
+    if (!craftsman) {
+      throw new NotFoundException(`Craftsman ${craftsmanId} not found`);
+    }
+    if (!craftsman.isActive) {
+      throw new BadRequestException(`Craftsman ${craftsmanId} is inactive`);
+    }
+  }
+
+  private async assertCraftsmanIsAssignedToTrade(
+    craftsmanId: string,
+    trade: string,
+  ): Promise<void> {
+    const assignment = await this.assignments.findOne({
+      where: {
+        craftsmanId,
+        trade,
+        isActive: true,
+      },
+    });
+    if (!assignment) {
+      throw new BadRequestException(`Craftsman ${craftsmanId} is not assigned to trade ${trade}`);
+    }
+  }
 
   private async findVersionEntityOrFail(
     versionId: string,
     user: JwtPayload,
   ): Promise<PricingCatalogVersion> {
-    const version = await this.versions.findOne({
-      where: { id: versionId },
+    const version = await this.findVersionWithRelations({ id: versionId });
+    if (!version) {
+      throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
+    }
+    this.assertCanAccess(version.craftsmanId, user);
+    return version;
+  }
+
+  private async findActivePublishedVersionOrFail(
+    craftsmanId: string,
+    trade: string,
+  ): Promise<PricingCatalogVersion> {
+    const version = await this.findVersionWithRelations({
+      craftsmanId,
+      trade,
+      status: PricingCatalogStatus.PUBLISHED,
+    });
+    if (!version) {
+      throw new NotFoundException(
+        `Active published pricing catalog for craftsman ${craftsmanId} and trade ${trade} not found`,
+      );
+    }
+    return version;
+  }
+
+  private findVersionWithRelations(
+    where: FindOptionsWhere<PricingCatalogVersion>,
+  ): Promise<PricingCatalogVersion | null> {
+    return this.versions.findOne({
+      where,
       relations: ['positions', 'positions.surcharges', 'discounts'],
       order: {
         positions: {
@@ -280,14 +324,6 @@ export class PricingCatalogsService {
         },
       },
     });
-
-    if (!version) {
-      throw new NotFoundException(`Pricing catalog version ${versionId} not found`);
-    }
-
-    this.assertCanAccess(version.craftsmanId, user);
-
-    return version;
   }
 
   private async validatePositionAttributes(
