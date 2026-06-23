@@ -7,6 +7,9 @@ import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.en
 import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
 import { PricingCatalogsController } from './pricing-catalogs.controller';
 import { PricingCatalogsService } from './pricing-catalogs.service';
+import { Craftsman } from '../craftsmen/entities/craftsman.entity';
+import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
+import { TradeConfig } from '../trades/entities/trade-config.entity';
 
 @Module({
   imports: [
@@ -15,6 +18,9 @@ import { PricingCatalogsService } from './pricing-catalogs.service';
       PricingCatalogPosition,
       PricingCatalogSurcharge,
       PricingCatalogDiscount,
+      Craftsman,
+      CraftsmanTradeAssignment,
+      TradeConfig,
     ]),
   ],
   controllers: [PricingCatalogsController],
