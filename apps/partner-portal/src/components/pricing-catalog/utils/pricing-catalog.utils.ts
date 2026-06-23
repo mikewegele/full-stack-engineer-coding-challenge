@@ -3,7 +3,7 @@ import {
   PricingCatalogVersionResponse,
   PricingSchema,
   PricingSchemaField,
-} from '../services/pricing-catalogs.service';
+} from '../../../services/pricing-catalogs.service';
 
 export type PricingCatalogTableRow = {
   key: string;

@@ -7,11 +7,6 @@ import {
   Snackbar,
   Stack,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Tabs,
   Typography,
 } from '@mui/material';
@@ -24,7 +19,6 @@ import {
   createPricingCatalog,
   listPricingCatalogs,
   listTrades,
-  PricingCatalogPositionResponse,
   PricingCatalogVersionResponse,
   publishPricingCatalog,
   TradeCode,
@@ -32,70 +26,16 @@ import {
   updatePricingCatalog,
   UpdatePricingCatalogPositionRequest,
 } from '../services/pricing-catalogs.service';
-import { PricingCatalogPositionDialog } from './PricingCatalogPositionDialog';
-import { PricingCatalogQuoteDialog } from './PricingCatalogQuoteDialog';
-import { mapCatalogToTableRows } from './pricing-catalog.utils';
+import { PricingCatalogPositionDialog } from '../components/pricing-catalog/position-dialog/PricingCatalogPositionDialog';
+import { PricingCatalogPositionsTable } from '../components/pricing-catalog/components/PricingCatalogPositionsTable';
+import { PricingCatalogQuoteDialog } from '../components/pricing-catalog/quote-dialog/PricingCatalogQuoteDialog';
+import {
+  findDraft,
+  findPublished,
+  toUpdatePositionRequest,
+} from '../components/pricing-catalog/utils/pricing-catalog-page.utils';
 
 type CatalogsByTrade = Record<string, PricingCatalogVersionResponse[]>;
-
-function findDraft(
-  catalogs: PricingCatalogVersionResponse[],
-): PricingCatalogVersionResponse | null {
-  return catalogs.find((catalog) => catalog.status === 'DRAFT') ?? null;
-}
-
-function findPublished(
-  catalogs: PricingCatalogVersionResponse[],
-): PricingCatalogVersionResponse | null {
-  return catalogs.find((catalog) => catalog.status === 'PUBLISHED') ?? null;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) {
-    return '—';
-  }
-
-  return new Intl.DateTimeFormat('de-DE').format(new Date(value));
-}
-
-function formatCents(value: number): string {
-  return new Intl.NumberFormat('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(value / 100);
-}
-
-function formatVatRate(value: string): string {
-  return new Intl.NumberFormat('de-DE', {
-    style: 'percent',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(Number(value));
-}
-
-function toOptionalNumber(value: string | null): number | undefined {
-  if (value === null) {
-    return undefined;
-  }
-
-  return Number(value);
-}
-
-function toUpdatePositionRequest(
-  position: PricingCatalogPositionResponse,
-): UpdatePricingCatalogPositionRequest {
-  return {
-    key: position.key,
-    label: position.label,
-    unit: position.unit,
-    netPriceCents: position.netPriceCents,
-    vatRate: Number(position.vatRate),
-    minQuantity: toOptionalNumber(position.minQuantity),
-    maxQuantity: toOptionalNumber(position.maxQuantity),
-    attributes: position.attributes,
-    surcharges: [],
-  };
-}
 
 export function PricingCatalogPage(): JSX.Element {
   const { t } = useTranslation();
@@ -362,7 +302,7 @@ export function PricingCatalogPage(): JSX.Element {
           </Stack>
 
           {draft ? (
-            <CatalogPositionsTable
+            <PricingCatalogPositionsTable
               catalog={draft}
               title={t('pricing.sections.draft')}
               publishing={publishingDraft}
@@ -386,7 +326,7 @@ export function PricingCatalogPage(): JSX.Element {
           )}
 
           {published ? (
-            <CatalogPositionsTable
+            <PricingCatalogPositionsTable
               catalog={published}
               title={t('pricing.sections.published')}
               onQuote={() => setQuoteDialogOpen(true)}
@@ -423,87 +363,5 @@ export function PricingCatalogPage(): JSX.Element {
         ) : undefined}
       </Snackbar>
     </Stack>
-  );
-}
-
-function CatalogPositionsTable(props: {
-  catalog: PricingCatalogVersionResponse;
-  title: string;
-  publishing?: boolean;
-  onAddPosition?: () => void;
-  onPublish?: () => void;
-  onQuote?: () => void;
-}): JSX.Element {
-  const { catalog, title, publishing = false, onAddPosition, onPublish, onQuote } = props;
-  const { t } = useTranslation();
-  const rows = mapCatalogToTableRows(catalog);
-  const canEdit = !!onAddPosition && !!onPublish;
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
-          <Stack spacing={0.5}>
-            <Typography variant="h3">{title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('pricing.effectiveFrom', { date: formatDate(catalog.effectiveFrom) })}
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            {canEdit ? (
-              <>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={onAddPosition}
-                  disabled={publishing}
-                >
-                  {t('pricing.positions.add')}
-                </Button>
-                <Button variant="contained" size="small" onClick={onPublish} disabled={publishing}>
-                  {publishing ? t('pricing.publishing') : t('pricing.publish')}
-                </Button>
-              </>
-            ) : null}
-            {onQuote ? (
-              <Button variant="outlined" size="small" onClick={onQuote}>
-                {t('pricing.quote.open')}
-              </Button>
-            ) : null}
-            <Chip label={catalog.status} />
-          </Stack>
-        </Stack>
-
-        {rows.length === 0 ? (
-          <Alert severity="info">{t('pricing.empty.noPositions')}</Alert>
-        ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t('pricing.positions.key')}</TableCell>
-                <TableCell>{t('pricing.positions.label')}</TableCell>
-                <TableCell>{t('pricing.positions.unit')}</TableCell>
-                <TableCell align="right">{t('pricing.positions.netPrice')}</TableCell>
-                <TableCell align="right">{t('pricing.positions.vatRate')}</TableCell>
-                <TableCell>{t('pricing.positions.attributes')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell>{row.key}</TableCell>
-                  <TableCell>{row.label}</TableCell>
-                  <TableCell>{row.unit}</TableCell>
-                  <TableCell align="right">{formatCents(row.netPriceCents)}</TableCell>
-                  <TableCell align="right">{formatVatRate(row.vatRate)}</TableCell>
-                  <TableCell>{row.attributesSummary}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Stack>
-    </Paper>
   );
 }

@@ -5,57 +5,28 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   MenuItem,
-  Paper,
   Stack,
   TextField,
-  Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ApiError } from '../services/api.service';
+import { ApiError } from '../../../services/api.service';
 import {
   createPricingCatalogQuote,
   PricingCatalogVersionResponse,
   PricingSchemaField,
   QuoteResult,
-} from '../services/pricing-catalogs.service';
-
-type QuoteFormValues = {
-  positionKey: string;
-  quantity: string;
-};
+} from '../../../services/pricing-catalogs.service';
+import { PricingCatalogQuoteResultView } from './PricingCatalogQuoteResultView';
+import { isValidNumber, QuoteFormValues } from './pricing-catalog-quote-dialog.utils';
 
 interface Props {
   open: boolean;
   catalog: PricingCatalogVersionResponse | null;
   fields: PricingSchemaField[];
   onClose: () => void;
-}
-
-function formatCents(value: number): string {
-  return new Intl.NumberFormat('de-DE', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(value / 100);
-}
-
-function isValidNumber(value: string): boolean {
-  return Number.isFinite(Number(value));
-}
-
-function calculateTotalSurchargeCents(result: QuoteResult): number {
-  return result.lines.reduce(
-    (sum, line) =>
-      sum +
-      line.appliedSurcharges.reduce(
-        (surchargeSum, surcharge) => surchargeSum + surcharge.amountCents,
-        0,
-      ),
-    0,
-  );
 }
 
 export function PricingCatalogQuoteDialog(props: Props): JSX.Element {
@@ -206,7 +177,7 @@ export function PricingCatalogQuoteDialog(props: Props): JSX.Element {
 
           {quoteError ? <Alert severity="error">{quoteError}</Alert> : null}
 
-          {quoteResult ? <QuoteResultView result={quoteResult} /> : null}
+          {quoteResult ? <PricingCatalogQuoteResultView result={quoteResult} /> : null}
         </Stack>
       </DialogContent>
 
@@ -216,82 +187,5 @@ export function PricingCatalogQuoteDialog(props: Props): JSX.Element {
         </Button>
       </DialogActions>
     </Dialog>
-  );
-}
-
-function QuoteResultView(props: { result: QuoteResult }): JSX.Element {
-  const { result } = props;
-  const { t } = useTranslation();
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack spacing={2}>
-        <Typography variant="h3">{t('pricing.quote.result.title')}</Typography>
-
-        <Stack spacing={1}>
-          <ResultRow
-            label={t('pricing.quote.result.subtotalNet')}
-            value={formatCents(result.totals.netCents)}
-          />
-          <ResultRow
-            label={t('pricing.quote.result.surcharge')}
-            value={formatCents(calculateTotalSurchargeCents(result))}
-          />
-          <ResultRow
-            label={t('pricing.quote.result.discount')}
-            value={formatCents(result.totals.discountCents)}
-          />
-          <Divider />
-          <ResultRow
-            label={t('pricing.quote.result.totalNet')}
-            value={formatCents(result.totals.netCents)}
-          />
-          <ResultRow
-            label={t('pricing.quote.result.vat')}
-            value={formatCents(result.totals.vatCents)}
-          />
-          <ResultRow
-            label={t('pricing.quote.result.totalGross')}
-            value={formatCents(result.totals.grossCents)}
-            strong
-          />
-        </Stack>
-
-        {result.lines.length > 0 ? (
-          <Stack spacing={1}>
-            <Typography variant="h4">{t('pricing.quote.result.lines')}</Typography>
-            {result.lines.map((line) => (
-              <Paper key={line.positionKey} variant="outlined" sx={{ p: 1.5 }}>
-                <Stack spacing={0.5}>
-                  <Typography variant="body1">{line.label}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('pricing.quote.result.lineSummary', {
-                      quantity: line.quantity,
-                      net: formatCents(line.netCents),
-                      gross: formatCents(line.grossCents),
-                    })}
-                  </Typography>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
-        ) : null}
-      </Stack>
-    </Paper>
-  );
-}
-
-function ResultRow(props: { label: string; value: string; strong?: boolean }): JSX.Element {
-  const { label, value, strong = false } = props;
-
-  return (
-    <Stack direction="row" justifyContent="space-between" spacing={2}>
-      <Typography variant="body2" fontWeight={strong ? 700 : 400}>
-        {label}
-      </Typography>
-      <Typography variant="body2" fontWeight={strong ? 700 : 400}>
-        {value}
-      </Typography>
-    </Stack>
   );
 }

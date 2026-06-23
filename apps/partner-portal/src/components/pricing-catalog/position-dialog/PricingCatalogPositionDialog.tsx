@@ -10,24 +10,22 @@ import {
   TextField,
 } from '@mui/material';
 import { useEffect, useMemo } from 'react';
-import { FieldError, useForm, UseFormRegister } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
   PricingSchemaField,
-  PricingUnit,
   UpdatePricingCatalogPositionRequest,
-} from '../services/pricing-catalogs.service';
-
-type PositionFormValues = {
-  key: string;
-  label: string;
-  unit: PricingUnit;
-  netPriceEuro: string;
-  vatRate: string;
-  minQuantity: string;
-  maxQuantity: string;
-  attributes: Record<string, string>;
-};
+} from '../../../services/pricing-catalogs.service';
+import { PricingCatalogDynamicAttributeField } from './PricingCatalogDynamicAttributeField';
+import {
+  isFieldVisible,
+  isValidNumber,
+  parseAttributeValue,
+  PositionFormValues,
+  pricingUnits,
+  toCents,
+  toOptionalNumber,
+} from './pricing-catalog-position-dialog.utils';
 
 interface Props {
   open: boolean;
@@ -35,44 +33,6 @@ interface Props {
   saving: boolean;
   onClose: () => void;
   onSave: (position: UpdatePricingCatalogPositionRequest) => void;
-}
-
-const units: PricingUnit[] = ['piece', 'm2', 'meter', 'hour', 'flat'];
-
-function toCents(value: string): number {
-  return Math.round(Number(value) * 100);
-}
-
-function toOptionalNumber(value: string): number | undefined {
-  if (value.trim().length === 0) {
-    return undefined;
-  }
-
-  return Number(value);
-}
-
-function parseAttributeValue(field: PricingSchemaField, value: string): unknown {
-  if (field.type === 'number') {
-    return Number(value);
-  }
-
-  if (field.type === 'boolean') {
-    return value === 'true';
-  }
-
-  return value;
-}
-
-function isFieldVisible(field: PricingSchemaField, values: PositionFormValues): boolean {
-  if (!field.dependsOn) {
-    return true;
-  }
-
-  return values.attributes[field.dependsOn.field] === String(field.dependsOn.equals);
-}
-
-function isValidNumber(value: string): boolean {
-  return Number.isFinite(Number(value));
 }
 
 export function PricingCatalogPositionDialog(props: Props): JSX.Element {
@@ -169,7 +129,7 @@ export function PricingCatalogPositionDialog(props: Props): JSX.Element {
               {...register('unit', { required: t('validation.required') })}
               disabled={saving}
             >
-              {units.map((unit) => (
+              {pricingUnits.map((unit) => (
                 <MenuItem key={unit} value={unit}>
                   {unit}
                 </MenuItem>
@@ -272,7 +232,7 @@ export function PricingCatalogPositionDialog(props: Props): JSX.Element {
 
           {fields.map((field) =>
             isFieldVisible(field, values) ? (
-              <DynamicAttributeField
+              <PricingCatalogDynamicAttributeField
                 key={field.name}
                 field={field}
                 register={register}
@@ -293,113 +253,5 @@ export function PricingCatalogPositionDialog(props: Props): JSX.Element {
         </Button>
       </DialogActions>
     </Dialog>
-  );
-}
-
-function DynamicAttributeField(props: {
-  field: PricingSchemaField;
-  register: UseFormRegister<PositionFormValues>;
-  error?: FieldError;
-  disabled: boolean;
-}): JSX.Element {
-  const { field, register, error, disabled } = props;
-  const { t } = useTranslation();
-
-  const validation = {
-    required: field.required ? t('validation.required') : false,
-    validate: (value: string) => {
-      if (!value) {
-        return true;
-      }
-
-      if (field.type === 'number') {
-        const numberValue = Number(value);
-
-        if (!Number.isFinite(numberValue)) {
-          return t('pricing.positionDialog.validation.invalidNumber');
-        }
-
-        if (field.min !== undefined && numberValue < field.min) {
-          return t('pricing.positionDialog.validation.min', { min: field.min });
-        }
-
-        if (field.max !== undefined && numberValue > field.max) {
-          return t('pricing.positionDialog.validation.max', { max: field.max });
-        }
-      }
-
-      return true;
-    },
-  };
-
-  if (field.type === 'enum') {
-    return (
-      <TextField
-        select
-        label={field.name}
-        fullWidth
-        defaultValue=""
-        {...register(`attributes.${field.name}`, validation)}
-        error={!!error}
-        helperText={error?.message}
-        disabled={disabled}
-      >
-        <MenuItem value="">{t('pricing.positionDialog.emptyValue')}</MenuItem>
-        {(field.values ?? []).map((value) => (
-          <MenuItem key={value} value={value}>
-            {value}
-          </MenuItem>
-        ))}
-      </TextField>
-    );
-  }
-
-  if (field.type === 'boolean') {
-    return (
-      <TextField
-        select
-        label={field.name}
-        fullWidth
-        defaultValue=""
-        {...register(`attributes.${field.name}`, validation)}
-        error={!!error}
-        helperText={error?.message}
-        disabled={disabled}
-      >
-        <MenuItem value="">{t('pricing.positionDialog.emptyValue')}</MenuItem>
-        <MenuItem value="true">{t('common.yes')}</MenuItem>
-        <MenuItem value="false">{t('common.no')}</MenuItem>
-      </TextField>
-    );
-  }
-
-  if (field.type === 'number') {
-    return (
-      <TextField
-        type="number"
-        label={field.name}
-        fullWidth
-        inputProps={{
-          min: field.min,
-          max: field.max,
-          step: 1,
-        }}
-        {...register(`attributes.${field.name}`, validation)}
-        error={!!error}
-        helperText={error?.message}
-        disabled={disabled}
-      />
-    );
-  }
-
-  return (
-    <TextField
-      label={field.name}
-      fullWidth
-      {...register(`attributes.${field.name}`, validation)}
-      error={!!error}
-      helperText={error?.message}
-      disabled={disabled}
-    />
   );
 }

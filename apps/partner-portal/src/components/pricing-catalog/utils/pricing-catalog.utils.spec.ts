@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PricingCatalogVersionResponse, PricingSchema } from '../services/pricing-catalogs.service';
+import {
+  PricingCatalogVersionResponse,
+  PricingSchema,
+} from '../../../services/pricing-catalogs.service';
 import {
   formatAttributesSummary,
   mapCatalogToTableRows,
