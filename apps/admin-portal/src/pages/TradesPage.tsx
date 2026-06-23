@@ -20,7 +20,7 @@ import { ApiError } from '../services/api.service';
 import { listTrades, TradeConfigResponse } from '../services/trades.service';
 import { AppButton } from '../components/button/AppButton';
 import ModeEditOutlineOutlinedIcon from '@mui/icons-material/ModeEditOutlineOutlined';
-import { SchemaEditorDialog } from './trades/SchemaEditorDialog';
+import { SchemaEditorDialog } from '../components/trades/SchemaEditorDialog';
 
 /**
  * Read-only trade list. Shows the *current* state of each trade's pricing
