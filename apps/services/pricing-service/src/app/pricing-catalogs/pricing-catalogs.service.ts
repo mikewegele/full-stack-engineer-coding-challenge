@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { FindOptionsWhere, Repository } from 'typeorm';
@@ -15,10 +10,7 @@ import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
-import {
-  UpdatePricingCatalogDto,
-  UpdatePricingCatalogPositionDto,
-} from './dto/update-pricing-catalog.dto';
+import { UpdatePricingCatalogDto, UpdatePricingCatalogPositionDto, } from './dto/update-pricing-catalog.dto';
 import { PricingCatalogPosition } from './entities/pricing-catalog-position.entity';
 import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
 import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
@@ -245,7 +237,9 @@ export class PricingCatalogsService {
       return manager.save(PricingCatalogVersion, version);
     });
 
-    return PricingCatalogResponseDto.from(published);
+    const reloaded = await this.findVersionWithRelations({ id: published.id });
+
+    return PricingCatalogResponseDto.from(reloaded ?? published);
   }
 
   async quoteActiveVersion(
