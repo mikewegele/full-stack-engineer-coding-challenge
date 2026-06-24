@@ -6,8 +6,8 @@ This document summarizes the main implementation decisions for the pricing catal
 
 ## Scope
 
-Implemented backend support for versioned pricing catalogs per `(craftsmanId, trade)` and an admin-facing trade schema
-editor.
+Implemented backend support for versioned pricing catalogs per `(craftsmanId, trade)`, an admin-facing trade schema
+editor, and a partner-facing pricing catalog workflow.
 
 Implemented:
 
@@ -18,9 +18,11 @@ Implemented:
 - trade-specific attribute validation through `pricingSchema`
 - admin editing of trade schemas through structured form controls
 - schema patch conflict detection for existing catalog positions
-
-The partner-portal catalog editor was intentionally not completed. The backend API and schema model are prepared for it,
-but the current frontend work focuses on the admin schema configuration path.
+- partner catalog management by assigned trade
+- dynamic partner position forms based on trade schemas
+- published catalog display in the partner portal
+- quote preview for published partner catalogs
+- local reset script for pricing catalog test data
 
 ## Data Model
 
@@ -69,6 +71,10 @@ The calculator evaluates a quote in this order:
 
 This order keeps line-level adjustments local to the line and catalog-level discounts deterministic.
 
+The partner portal currently exposes quote preview for published catalogs using position and quantity. Attribute-based
+quote requests were intentionally not added because the backend quote DTO accepts position keys, quantities, and
+optional surcharge keys, but not arbitrary attributes.
+
 ## Trade-Specific Pricing Schema
 
 `pricingSchema` is stored as JSONB on `TradeConfig`.
@@ -79,7 +85,7 @@ Supported schema features:
 - required fields
 - numeric `min` / `max`
 - enum value lists
-- conditional required fields through `dependsOn`
+- conditional fields through `dependsOn`
 
 Validation is implemented as a pure function and is applied when draft positions are written.
 
@@ -93,6 +99,10 @@ Publishing runs inside a database transaction. The service checks that the catal
 craftsman, the catalog is still a draft, and no published catalog already exists for the same `(craftsmanId, trade)`.
 
 A pessimistic database lock is used during publishing so two concurrent publish calls cannot both win.
+
+After publishing, the service reloads the catalog with positions, surcharges, and discounts before returning the
+response. This ensures the partner portal can show the newly published catalog immediately without requiring a browser
+refresh.
 
 Rejected alternatives:
 
@@ -110,7 +120,7 @@ service layer and are used consistently for read, write, publish, and quote oper
 
 ## Admin Portal
 
-The admin portal now provides a structured schema editor on the trade configuration page.
+The admin portal provides a structured schema editor on the trade configuration page.
 
 It supports:
 
@@ -120,24 +130,58 @@ It supports:
 - allowed values for enum fields
 - optional `dependsOn` configuration
 - validation before saving
+- MUI field-level validation for invalid schema fields
 - success and error feedback via MUI states/snackbar
 - generated API types from the OpenAPI document, with a narrower local type for `pricingSchema`
 
 The editor intentionally avoids direct JSON editing.
 
+## Partner Portal
+
+The partner portal provides a pricing catalog workflow for authenticated craftsman users.
+
+It supports:
+
+- login redirect directly to the pricing catalog page
+- listing assigned trade categories
+- loading draft and published catalogs per trade
+- creating an empty draft catalog
+- adding positions through a dynamic form based on the trade schema
+- validating required fields and numeric values with MUI form states
+- publishing a draft catalog
+- displaying the active published catalog
+- calculating a quote preview for published catalog positions
+
+The partner portal uses the generated OpenAPI types where available and adds local response types for quote results
+where the generated schema does not expose a complete response DTO.
+
+## Local Development Utilities
+
+A helper script was added for resetting pricing catalog test data without deleting users, trades, or craftsmen:
+
+```bash
+./scripts/db/reset-pricing-catalogs.sh windows
+./scripts/db/reset-pricing-catalogs.sh hvac
+./scripts/db/reset-pricing-catalogs.sh
+```
+
+The script targets the `pricing` database and the `pricing_service` schema. It deletes pricing catalog versions and
+their dependent positions, surcharges, and discounts for a given trade or for all trades.
+
 ## Not Implemented
 
 The following parts were intentionally left out or simplified:
 
-- partner-portal catalog editor and dynamic position form
 - time-travel quote lookup by arbitrary timestamp
 - multiple published versions with validity intervals
+- automatic replacement of an existing published catalog when publishing a new draft
 - idempotency keys for quote endpoints
 - Terraform / AWS deployment
 - advanced migration tooling for already existing position attributes
+- attribute-based quote requests
 
-These were cut to keep the implemented backend, calculator, schema validation, and admin configuration path coherent and
-tested.
+These were cut to keep the implemented backend, calculator, schema validation, admin configuration path, and partner
+catalog workflow coherent and tested.
 
 ## Tests
 
@@ -151,48 +195,80 @@ Implemented tests cover:
 - active published catalog quoting
 - access control checks
 - admin schema editor data-processing helpers
+- partner pricing catalog table mapping helpers
 
 Current verification commands:
 
 - `yarn workspace @sandbox/admin-portal test`
+- `yarn workspace @sandbox/admin-portal build`
+- `yarn workspace @sandbox/partner-portal test`
+- `yarn workspace @sandbox/partner-portal build`
 - `yarn workspace @sandbox/pricing-service test`
+
+## Manual Verification
+
+The main browser flow was verified manually:
+
+1. Admin configures optional schema fields for a trade.
+2. Partner logs in and is redirected to the pricing catalog page.
+3. Partner creates a draft catalog.
+4. Partner adds a position using dynamic schema fields.
+5. Partner publishes the draft.
+6. The published catalog updates without requiring a refresh.
+7. Partner calculates a quote preview.
+8. Quote totals are displayed without `NaN` values.
 
 ## Run Notes
 
 The stack runs through Docker Compose:
 
-- `docker compose up --build`
+```bash
+docker compose up --build
+```
 
 The pricing service exposes Swagger at:
 
-- `http://localhost:3000/api/docs`
+```text
+http://localhost:3000/api/docs
+```
 
-OpenAPI types for the admin portal can be regenerated from the running pricing service:
+OpenAPI types can be regenerated from the running pricing service:
 
-- `yarn workspace @sandbox/admin-portal generate:pricing-api`
+```bash
+yarn workspace @sandbox/admin-portal generate:pricing-api
+yarn workspace @sandbox/partner-portal generate:pricing-api
+```
 
 ## AI Usage
 
-- Manually started and implemented:
-  - service logic and private helper methods
-  - DTOs, entities, and controller endpoints
-  - validation schema
-  - initial quote calculation structure
-  - admin schema editor integration and UI flow
+Manually started and implemented:
 
-- AI-assisted parts:
-  - fixing TypeScript and test errors during implementation
-  - reviewing and improving DTOs, entities, and controller code
-  - refining quote calculation logic
-  - checking edge cases and validation behavior
-  - reviewing frontend schema-editor state handling
-  - admin-portal i18n keys and validation messages
-  - documentation wording
+- service logic and private helper methods
+- DTOs, entities, and controller endpoints
+- validation schema
+- initial quote calculation structure
+- admin schema editor integration and UI flow
+- partner pricing catalog workflow
+- local reset script for pricing catalog test data
 
-- Validation and review:
-  - reviewed generated suggestions manually before applying them
-  - rejected or adjusted suggestions that did not fit the existing project structure
-  - validated backend behavior with the pricing-service test suite
-  - validated admin data-processing logic with the admin-portal test suite
-  - manually tested the admin schema editor in the browser
-  - verified persisted `pricingSchema` values directly through the database/API
+AI-assisted parts:
+
+- fixing TypeScript and test errors during implementation
+- reviewing and improving DTOs, entities, and controller code
+- refining quote calculation logic
+- checking edge cases and validation behavior
+- reviewing frontend schema-editor state handling
+- refactoring frontend components into smaller files
+- admin-portal and partner-portal i18n keys and validation messages
+- documentation wording
+
+Validation and review:
+
+- reviewed generated suggestions manually before applying them
+- rejected or adjusted suggestions that did not fit the existing project structure
+- validated backend behavior with the pricing-service test suite
+- validated admin data-processing logic with the admin-portal test suite
+- validated partner catalog helper logic with the partner-portal test suite
+- manually tested the admin schema editor in the browser
+- manually tested the partner draft, publish, and quote-preview flow in the browser
+- verified persisted `pricingSchema` and pricing catalog values through the database/API

@@ -1,6 +1,8 @@
 # Trade Pricing Challenge — Sandbox
 
-This is the sandbox monorepo for the coding challenge. Read the task description in **[`CHALLENGE.en.md`](./CHALLENGE.en.md)** (English) or **[`CHALLENGE.de.md`](./CHALLENGE.de.md)** (Deutsch). Then read **[`CONVENTIONS.md`](./CONVENTIONS.md)** for the coding conventions you must follow.
+This is the sandbox monorepo for the coding challenge. Read the task description in *
+*[`CHALLENGE.en.md`](./CHALLENGE.en.md)** (English) or **[`CHALLENGE.de.md`](./CHALLENGE.de.md)** (Deutsch). Then read *
+*[`CONVENTIONS.md`](./CONVENTIONS.md)** for the coding conventions you must follow.
 
 ---
 
@@ -24,7 +26,8 @@ Pick **one** of the two paths below.
 docker compose up --build
 ```
 
-That's it. Each service's container runs its migrations and seed before starting, so on first boot you get a fully initialized database without any manual steps. Subsequent restarts are no-ops (migrations and seed are idempotent).
+That's it. Each service's container runs its migrations and seed before starting, so on first boot you get a fully
+initialized database without any manual steps. Subsequent restarts are no-ops (migrations and seed are idempotent).
 
 - Auth service: <http://localhost:3001/api/v1> — Swagger at <http://localhost:3001/api/docs>
 - Pricing service: <http://localhost:3000/api/v1> — Swagger at <http://localhost:3000/api/docs>
@@ -49,20 +52,24 @@ In four terminals:
 # Terminal 1
 yarn nx serve auth-service          # port 3001
 ```
+
 ```bash
 # Terminal 2
 yarn nx serve pricing-service       # port 3000
 ```
+
 ```bash
 # Terminal 3
 yarn nx serve partner-portal        # port 4200
 ```
+
 ```bash
 # Terminal 4
 yarn nx serve admin-portal          # port 4201
 ```
 
-Use Path B if you want NestJS hot-reload to be snappier — running outside Docker avoids the volume-mount filesystem overhead.
+Use Path B if you want NestJS hot-reload to be snappier — running outside Docker avoids the volume-mount filesystem
+overhead.
 
 ---
 
@@ -97,25 +104,31 @@ Use Path B if you want NestJS hot-reload to be snappier — running outside Dock
 ```
 
 - **auth-service** issues JWTs at `POST /auth/login` and exposes `/auth/me`. It owns the `users` table.
-- **pricing-service** owns craftsmen, trades, and (your work) the pricing catalog. It validates JWTs **locally** using the same `JWT_SECRET` — there is no live call from pricing-service to auth-service during request handling.
+- **pricing-service** owns craftsmen, trades, and (your work) the pricing catalog. It validates JWTs **locally** using
+  the same `JWT_SECRET` — there is no live call from pricing-service to auth-service during request handling.
 - **partner-portal** (`/4200`) is the craftsman-facing UI: my profile, my pricing catalog.
-- **admin-portal** (`/4201`) is the admin-facing UI: configure trades and their pricing schemas. Rejects login by anyone who is not an `ADMIN`.
-- Both portals store the token in `localStorage` and attach `Authorization: Bearer <jwt>` to every request, regardless of which service it goes to.
+- **admin-portal** (`/4201`) is the admin-facing UI: configure trades and their pricing schemas. Rejects login by anyone
+  who is not an `ADMIN`.
+- Both portals store the token in `localStorage` and attach `Authorization: Bearer <jwt>` to every request, regardless
+  of which service it goes to.
 
-This mirrors the production pattern: each service owns its schema, JWTs are verified locally, and inter-service identity travels in the token claims.
+This mirrors the production pattern: each service owns its schema, JWTs are verified locally, and inter-service identity
+travels in the token claims.
 
 ---
 
 ## 4. Seeded credentials
 
-| Role | Email | Password | Notes |
-|---|---|---|---|
-| `ADMIN` | `admin@example.com` | `admin123` | Full access; no `craftsmanId` claim. Use this in the **admin-portal** (`:4201`). |
+| Role        | Email                 | Password     | Notes                                                                                                                                                   |
+|-------------|-----------------------|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ADMIN`     | `admin@example.com`   | `admin123`   | Full access; no `craftsmanId` claim. Use this in the **admin-portal** (`:4201`).                                                                        |
 | `CRAFTSMAN` | `partner@example.com` | `partner123` | Bound to seeded craftsman (`11111111-1111-1111-1111-111111111111`) with `HVAC` and `WINDOWS` assignments. Use this in the **partner-portal** (`:4200`). |
 
-The admin-portal rejects login by non-admins; the partner-portal accepts both but its *My Profile* page is craftsman-scoped (empty state for admins).
+The admin-portal rejects login by non-admins; the partner-portal accepts both but its *My Profile* page is
+craftsman-scoped (empty state for admins).
 
-The partner craftsman's id is deterministic (`11111111-…`) so that auth-service and pricing-service seeds align without needing to read each other's database.
+The partner craftsman's id is deterministic (`11111111-…`) so that auth-service and pricing-service seeds align without
+needing to read each other's database.
 
 ---
 
@@ -148,22 +161,26 @@ trade-pricing-challenge/
 
 When you need to understand a convention, look at:
 
-| Convention | Reference |
-|---|---|
-| Entity shape | `apps/services/pricing-service/src/app/craftsmen/entities/craftsman.entity.ts` |
-| DTO patterns | `apps/services/pricing-service/src/app/craftsmen/dto/` |
-| Controller | `apps/services/pricing-service/src/app/craftsmen/craftsmen.controller.ts` |
-| Service + authz | `apps/services/pricing-service/src/app/craftsmen/craftsmen.service.ts` |
-| Backend tests | `apps/services/pricing-service/src/app/craftsmen/*.spec.ts` |
-| Migration | `apps/services/pricing-service/src/migrations/1704067200000-Init.ts` |
-| Local JWT validation | `apps/services/pricing-service/src/app/auth/` |
-| MUI page with form (craftsman) | `apps/partner-portal/src/pages/ProfilePage.tsx` |
-| MUI page with table (admin) | `apps/admin-portal/src/pages/TradesPage.tsx` |
-| Admin-only login flow | `apps/admin-portal/src/contexts/AuthContext.tsx` |
-| i18n usage | `apps/partner-portal/src/i18n/locales/de.json` |
-| API clients (auth + main) | `apps/admin-portal/src/services/api.service.ts` |
+| Convention                     | Reference                                                                      |
+|--------------------------------|--------------------------------------------------------------------------------|
+| Entity shape                   | `apps/services/pricing-service/src/app/craftsmen/entities/craftsman.entity.ts` |
+| DTO patterns                   | `apps/services/pricing-service/src/app/craftsmen/dto/`                         |
+| Controller                     | `apps/services/pricing-service/src/app/craftsmen/craftsmen.controller.ts`      |
+| Service + authz                | `apps/services/pricing-service/src/app/craftsmen/craftsmen.service.ts`         |
+| Backend tests                  | `apps/services/pricing-service/src/app/craftsmen/*.spec.ts`                    |
+| Migration                      | `apps/services/pricing-service/src/migrations/1704067200000-Init.ts`           |
+| Local JWT validation           | `apps/services/pricing-service/src/app/auth/`                                  |
+| MUI page with form (craftsman) | `apps/partner-portal/src/pages/ProfilePage.tsx`                                |
+| MUI page with table (admin)    | `apps/admin-portal/src/pages/TradesPage.tsx`                                   |
+| Admin-only login flow          | `apps/admin-portal/src/contexts/AuthContext.tsx`                               |
+| i18n usage                     | `apps/partner-portal/src/i18n/locales/de.json`                                 |
+| API clients (auth + main)      | `apps/admin-portal/src/services/api.service.ts`                                |
+| Partner pricing catalog UI     | `apps/partner-portal/src/pages/PricingCatalogPage.tsx`                         |
+| Admin trade schema editor      | `apps/admin-portal/src/components/trades/SchemaEditorDialog.tsx`               |
+| Pricing catalog reset script   | `scripts/db/reset-pricing-catalogs.sh`                                         |
 
-> Your work goes into `pricing-service`. **Do not** add new endpoints to `auth-service`; user identity belongs there and the challenge does not extend it.
+> Your work goes into `pricing-service`. **Do not** add new endpoints to `auth-service`; user identity belongs there and
+> the challenge does not extend it.
 
 ---
 
@@ -198,21 +215,52 @@ yarn nx run auth-service:seed
 yarn nx run pricing-service:seed
 ```
 
+### Pricing catalog test-data reset
+
+To reset only pricing catalog test data without deleting users, trades, or craftsmen:
+
+```bash
+# Reset pricing catalogs for one trade
+./scripts/db/reset-pricing-catalogs.sh windows
+./scripts/db/reset-pricing-catalogs.sh hvac
+
+# Reset all pricing catalogs
+./scripts/db/reset-pricing-catalogs.sh
+```
+
 ---
 
 ## 7. Troubleshooting
 
 **"relation does not exist" errors** —
-- If `auth_service.users` or `pricing_service.craftsmen` does not exist on first boot, migrations did not run. Under Docker the entrypoint runs them automatically; if you skipped that (e.g. went straight to `docker compose up` against an older image), rebuild: `docker compose down && docker compose up --build`. Under Path B, run `yarn nx run auth-service:migration:run` and `yarn nx run pricing-service:migration:run` before starting the services.
-- If the error is for one of *your* tables, you likely forgot the schema prefix in a migration or raw query. Pricing-service tables live under `pricing_service.*`; auth-service tables live under `auth_service.*`. See `CONVENTIONS.md` §3.7.
 
-**"jwt malformed" on every request** — the partner-portal stores the token in `localStorage`. Clear it via DevTools or run `localStorage.clear()` in the console.
+- If `auth_service.users` or `pricing_service.craftsmen` does not exist on first boot, migrations did not run. Under
+  Docker the entrypoint runs them automatically; if you skipped that (e.g. went straight to `docker compose up` against
+  an older image), rebuild: `docker compose down && docker compose up --build`. Under Path B, run
+  `yarn nx run auth-service:migration:run` and `yarn nx run pricing-service:migration:run` before starting the services.
+- If the error is for one of *your* tables, you likely forgot the schema prefix in a migration or raw query.
+  Pricing-service tables live under `pricing_service.*`; auth-service tables live under `auth_service.*`. See
+  `CONVENTIONS.md` §3.7.
 
-**"Invalid credentials" on a valid password** — make sure you ran `yarn nx run auth-service:seed` after spinning up Postgres.
+**Pricing catalog data already exists during manual testing** —
 
-**Postgres won't start** — port 5432 is likely already in use. Override with `POSTGRES_PORT=5433 docker compose up -d postgres`.
+Use the helper script to remove only pricing catalog versions and their dependent positions, surcharges, and discounts:
 
-**Tests pass locally but the suite is slow** — that's expected; the test database resets between suites. Run a single file with `--testFile=` while iterating.
+```bash
+./scripts/db/reset-pricing-catalogs.sh windows
+```
+
+**"jwt malformed" on every request** — the partner-portal stores the token in `localStorage`. Clear it via DevTools or
+run `localStorage.clear()` in the console.
+
+**"Invalid credentials" on a valid password** — make sure you ran `yarn nx run auth-service:seed` after spinning up
+Postgres.
+
+**Postgres won't start** — port 5432 is likely already in use. Override with
+`POSTGRES_PORT=5433 docker compose up -d postgres`.
+
+**Tests pass locally but the suite is slow** — that's expected; the test database resets between suites. Run a single
+file with `--testFile=` while iterating.
 
 ---
 
@@ -221,7 +269,8 @@ yarn nx run pricing-service:seed
 When you're done:
 
 1. Create a **private repository in your own GitHub account** and push your work to it.
-2. Invite **`christopher.maeuer@deutsche-sanierungsberatung.de`** as a collaborator on the repo (Settings → Collaborators → Add people, by email).
+2. Invite **`christopher.maeuer@deutsche-sanierungsberatung.de`** as a collaborator on the repo (Settings →
+   Collaborators → Add people, by email).
 3. Send a short message letting us know the repo is ready, and include the repository URL.
 
 Make sure that on a clean clone:
