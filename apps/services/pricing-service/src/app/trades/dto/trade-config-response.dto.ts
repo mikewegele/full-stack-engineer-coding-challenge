@@ -17,6 +17,9 @@ export class TradeConfigResponseDto {
   @ApiProperty({ type: Object })
   metadata: Record<string, unknown>;
 
+  @ApiProperty({ type: Object })
+  pricingSchema: Record<string, unknown>;
+
   static from(t: TradeConfig): TradeConfigResponseDto {
     return {
       id: t.id,
@@ -24,6 +27,7 @@ export class TradeConfigResponseDto {
       displayName: t.displayName,
       isActive: t.isActive,
       metadata: t.metadata,
+      pricingSchema: t.pricingSchema,
     };
   }
 }

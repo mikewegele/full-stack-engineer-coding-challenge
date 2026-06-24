@@ -3,6 +3,10 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { Craftsman } from './app/craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from './app/craftsmen/entities/craftsman-trade-assignment.entity';
 import { TradeConfig } from './app/trades/entities/trade-config.entity';
+import { PricingCatalogVersion } from './app/pricing-catalogs/entities/pricing-catalog-version.entity';
+import { PricingCatalogPosition } from './app/pricing-catalogs/entities/pricing-catalog-position.entity';
+import { PricingCatalogDiscount } from './app/pricing-catalogs/entities/pricing-catalog-discount.entity';
+import { PricingCatalogSurcharge } from './app/pricing-catalogs/entities/pricing-catalog-surcharge.entity';
 
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
@@ -12,7 +16,15 @@ export const dataSourceOptions: DataSourceOptions = {
   password: process.env.DATABASE_PASSWORD ?? 'postgres',
   database: process.env.DATABASE_NAME ?? 'pricing',
   schema: process.env.DATABASE_SCHEMA ?? 'pricing_service',
-  entities: [Craftsman, CraftsmanTradeAssignment, TradeConfig],
+  entities: [
+    Craftsman,
+    CraftsmanTradeAssignment,
+    TradeConfig,
+    PricingCatalogVersion,
+    PricingCatalogPosition,
+    PricingCatalogDiscount,
+    PricingCatalogSurcharge,
+  ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   migrationsRun: false,
   synchronize: false,

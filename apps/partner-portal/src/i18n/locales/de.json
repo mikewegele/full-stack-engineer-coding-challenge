@@ -7,6 +7,10 @@
       "network": "Verbindung zum Server fehlgeschlagen."
     }
   },
+  "common": {
+    "yes": "Ja",
+    "no": "Nein"
+  },
   "nav": {
     "profile": "Mein Profil",
     "pricing": "Mein Preiskatalog",
@@ -25,6 +29,102 @@
       "invalidCredentials": "Anmeldedaten sind falsch."
     },
     "hint": "Verwende admin@example.com / admin123 oder partner@example.com / partner123."
+  },
+  "pricing": {
+    "heading": "Mein Preiskatalog",
+    "subheading": "Verwalte Deine Preis-Kataloge pro Trade-Kategorie.",
+    "schemaFields": "{{count}} Schema-Felder",
+    "effectiveFrom": "Gültig ab {{date}}",
+    "positionCount": "{{count}} Positionen",
+    "createDraft": "Leere Draft starten",
+    "creatingDraft": "Draft wird erstellt …",
+    "publish": "Draft veröffentlichen",
+    "publishing": "Wird veröffentlicht …",
+    "sections": {
+      "draft": "Aktuelle Draft",
+      "published": "Aktiv veröffentlichter Katalog"
+    },
+    "status": {
+      "hasDraft": "Draft vorhanden",
+      "noDraft": "Keine Draft",
+      "hasPublished": "Veröffentlicht",
+      "noPublished": "Nicht veröffentlicht"
+    },
+    "empty": {
+      "noCraftsman": "Es ist kein Craftsman mit diesem Konto verknüpft.",
+      "noTrades": "Dir sind noch keine Trade-Kategorien zugeordnet.",
+      "noDraftTitle": "Noch keine Draft vorhanden",
+      "noDraftFromPublished": "Starte eine neue Draft, um den aktiven Katalog zu bearbeiten.",
+      "noDraftEmpty": "Starte eine leere Draft, um Deinen ersten Preiskatalog anzulegen.",
+      "noPositions": "Diese Draft enthält noch keine Positionen."
+    },
+    "messages": {
+      "loadFailed": "Preiskatalog konnte nicht geladen werden.",
+      "createDraftFailed": "Draft konnte nicht erstellt werden.",
+      "draftCreated": "Draft wurde erstellt.",
+      "positionSaved": "Position wurde gespeichert.",
+      "positionSaveFailed": "Position konnte nicht gespeichert werden.",
+      "published": "Preiskatalog wurde veröffentlicht.",
+      "publishFailed": "Preiskatalog konnte nicht veröffentlicht werden."
+    },
+    "positions": {
+      "add": "Position hinzufügen",
+      "key": "Key",
+      "label": "Bezeichnung",
+      "unit": "Einheit",
+      "netPrice": "Nettopreis",
+      "vatRate": "MwSt.",
+      "attributes": "Attribute"
+    },
+    "positionDialog": {
+      "title": "Position hinzufügen",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert …",
+      "emptyValue": "Bitte auswählen",
+      "noSchemaFields": "Für diesen Trade sind keine Schema-Felder konfiguriert.",
+      "fields": {
+        "key": "Key",
+        "label": "Bezeichnung",
+        "unit": "Einheit",
+        "netPrice": "Nettopreis in Euro",
+        "vatRate": "MwSt.-Satz",
+        "minQuantity": "Mindestmenge",
+        "maxQuantity": "Maximalmenge"
+      },
+      "validation": {
+        "invalidNumber": "Bitte gib eine gültige Zahl ein.",
+        "min": "Der Wert muss mindestens {{min}} sein.",
+        "max": "Der Wert darf höchstens {{max}} sein.",
+        "integer": "Bitte gib eine ganze Zahl ein."
+      }
+    },
+    "quote": {
+      "open": "Kostenvorschau berechnen",
+      "title": "Kostenvorschau berechnen",
+      "close": "Schließen",
+      "calculate": "Berechnen",
+      "calculating": "Wird berechnet …",
+      "empty": "Für diesen veröffentlichten Katalog sind keine Positionen vorhanden.",
+      "fields": {
+        "position": "Position",
+        "quantity": "Menge"
+      },
+      "messages": {
+        "failed": "Kostenvorschau konnte nicht berechnet werden."
+      },
+      "result": {
+        "title": "Ergebnis",
+        "subtotalNet": "Zwischensumme netto",
+        "surcharge": "Zuschläge",
+        "discount": "Rabatte",
+        "totalNet": "Gesamt netto",
+        "vat": "MwSt.",
+        "totalGross": "Gesamt brutto",
+        "lines": "Positionen",
+        "lineSummary": "{{quantity}} × netto {{net}}, brutto {{gross}}"
+      }
+    }
   },
   "profile": {
     "heading": "Mein Profil",

@@ -40,10 +40,17 @@ function createClient(baseURL: string): AxiosInstance {
     (res) => res,
     (err: AxiosError) => {
       if (isAxiosError(err) && err.response) {
-        const data = err.response.data as { message?: string } | undefined;
-        const message = typeof data?.message === 'string' ? data.message : err.message;
+        const data = err.response.data as
+          | { message?: string | string[]; error?: string }
+          | undefined;
+
+        const message = Array.isArray(data?.message)
+          ? data.message.join(', ')
+          : (data?.message ?? data?.error ?? err.message);
+
         return Promise.reject(new ApiError(err.response.status, message, err.response.data));
       }
+
       return Promise.reject(new ApiError(0, err.message ?? 'Network error'));
     },
   );

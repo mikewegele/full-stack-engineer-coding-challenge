@@ -8,6 +8,10 @@
       "forbidden": "You do not have access."
     }
   },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
+  },
   "nav": {
     "trades": "Trade configuration",
     "craftsmen": "Craftsmen",
@@ -31,15 +35,56 @@
   "trades": {
     "heading": "Trade configuration",
     "subheading": "All trade categories and their pricing schemas.",
+    "actions": {
+      "editSchema": "Edit schema"
+    },
     "columns": {
       "code": "Code",
       "displayName": "Name",
       "isActive": "Active",
-      "fieldCount": "Schema fields"
+      "fieldCount": "Schema fields",
+      "action": "Action"
     },
     "emptyState": "No trade categories found.",
     "loadFailed": "Could not load trades.",
     "viewSchema": "View schema",
+    "schemaEditor": {
+      "heading": "Schema for {{trade}}",
+      "emptyState": "No schema fields configured yet.",
+      "addField": "Add field",
+      "removeField": "Remove field",
+      "saveSuccess": "Schema was saved successfully.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "moveFieldUp": "Move field up",
+      "moveFieldDown": "Move field down",
+      "valuesHelp": "Comma-separated values, e.g. small, medium, large",
+      "fields": {
+        "name": "Name",
+        "type": "Type",
+        "required": "Required",
+        "min": "Minimum",
+        "max": "Maximum",
+        "values": "Allowed values",
+        "dependsOnField": "Depends on field",
+        "dependsOnEquals": "Activating value",
+        "dependsOnNone": "No dependency"
+      },
+      "fieldTypes": {
+        "string": "Text",
+        "number": "Number",
+        "boolean": "Yes/No",
+        "enum": "Selection"
+      },
+      "validation": {
+        "emptyName": "Field names must not be empty.",
+        "duplicateName": "Field names must be unique.",
+        "invalidNumberRange": "Minimum must not be greater than maximum.",
+        "emptyEnumValues": "Enum fields require at least one allowed value.",
+        "unknownDependencyField": "The dependency references an unknown field.",
+        "selfDependencyField": "A field must not depend on itself."
+      }
+    },
     "schemaPlaceholder": "No pricing schema has been configured for this trade yet.",
     "schemaPropertyNames": {
       "name": "Name",
