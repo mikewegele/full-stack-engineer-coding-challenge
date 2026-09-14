@@ -142,37 +142,37 @@ export class PricingCatalogsService {
     dto: UpdatePricingCatalogDto,
     user: JwtPayload,
   ): Promise<PricingCatalogResponseDto> {
-    const existing = await this.versions.findOne({
-      where: { id: versionId },
-      relations: {
-        positions: {
-          surcharges: true,
-        },
-        discounts: true,
-      },
-    });
+    const updatedVersionId = await this.versions.manager.transaction(async (manager) => {
+      const versionRepository = manager.getRepository(PricingCatalogVersion);
+      const positionRepository = manager.getRepository(PricingCatalogPosition);
+      const surchargeRepository = manager.getRepository(PricingCatalogSurcharge);
+      const discountRepository = manager.getRepository(PricingCatalogDiscount);
 
-    if (!existing) {
-      throw new NotFoundException(`Pricing catalog ${versionId} not found`);
-    }
+      const existing = await versionRepository.findOne({
+        where: { id: versionId },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    this.assertCanAccess(existing.craftsmanId, user);
+      if (!existing) {
+        throw new NotFoundException(`Pricing catalog ${versionId} not found`);
+      }
 
-    if (existing.status !== PricingCatalogStatus.DRAFT) {
-      throw new BadRequestException('Only draft pricing catalogs can be updated');
-    }
+      this.assertCanAccess(existing.craftsmanId, user);
 
-    if (dto.positions !== undefined) {
-      await this.validatePositionAttributes(existing.trade, dto.positions);
-    }
+      if (existing.status !== PricingCatalogStatus.DRAFT) {
+        throw new BadRequestException('Only draft pricing catalogs can be updated');
+      }
 
-    Object.assign(existing, {
-      ...(dto.effectiveFrom !== undefined && {
-        effectiveFrom: new Date(dto.effectiveFrom),
-      }),
-      ...(dto.positions !== undefined && {
-        positions: dto.positions.map((positionDto) =>
-          this.positions.create({
+      if (dto.positions !== undefined) {
+        await this.validatePositionAttributes(existing.trade, dto.positions);
+
+        await positionRepository.delete({
+          versionId: existing.id,
+        });
+
+        const newPositions = dto.positions.map((positionDto) =>
+          positionRepository.create({
+            versionId: existing.id,
             key: positionDto.key,
             label: positionDto.label,
             unit: positionDto.unit,
@@ -184,7 +184,7 @@ export class PricingCatalogsService {
               positionDto.maxQuantity !== undefined ? String(positionDto.maxQuantity) : null,
             attributes: positionDto.attributes ?? {},
             surcharges: (positionDto.surcharges ?? []).map((surchargeDto) =>
-              this.surcharges.create({
+              surchargeRepository.create({
                 key: surchargeDto.key,
                 label: surchargeDto.label,
                 type: surchargeDto.type,
@@ -194,11 +194,21 @@ export class PricingCatalogsService {
               }),
             ),
           }),
-        ),
-      }),
-      ...(dto.discounts !== undefined && {
-        discounts: dto.discounts.map((discountDto) =>
-          this.discounts.create({
+        );
+
+        if (newPositions.length > 0) {
+          await positionRepository.save(newPositions);
+        }
+      }
+
+      if (dto.discounts !== undefined) {
+        await discountRepository.delete({
+          versionId: existing.id,
+        });
+
+        const newDiscounts = dto.discounts.map((discountDto) =>
+          discountRepository.create({
+            versionId: existing.id,
             key: discountDto.key,
             label: discountDto.label,
             type: discountDto.type,
@@ -209,12 +219,30 @@ export class PricingCatalogsService {
             appliesTo: discountDto.appliesTo,
             sortOrder: discountDto.sortOrder ?? 0,
           }),
-        ),
-      }),
+        );
+
+        if (newDiscounts.length > 0) {
+          await discountRepository.save(newDiscounts);
+        }
+      }
+
+      if (dto.effectiveFrom !== undefined) {
+        existing.effectiveFrom = new Date(dto.effectiveFrom);
+      }
+
+      const saved = await versionRepository.save(existing);
+      return saved.id;
     });
 
-    const saved = await this.versions.save(existing);
-    return PricingCatalogResponseDto.from(saved);
+    const reloaded = await this.findVersionWithRelations({
+      id: updatedVersionId,
+    });
+
+    if (!reloaded) {
+      throw new NotFoundException(`Pricing catalog ${updatedVersionId} not found after update`);
+    }
+
+    return PricingCatalogResponseDto.from(reloaded);
   }
 
   async publish(versionId: string, user: JwtPayload): Promise<PricingCatalogResponseDto> {

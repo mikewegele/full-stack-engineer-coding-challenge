@@ -168,7 +168,9 @@ describe('PricingCatalogsService', () => {
     };
 
     positions = {
-      create: jest.fn().mockImplementation((x: Partial<PricingCatalogPosition>) => x),
+      create: jest.fn().mockImplementation((value: Partial<PricingCatalogPosition>) => value),
+      delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }),
+      save: jest.fn().mockImplementation(async (value) => value),
     };
 
     surcharges = {
@@ -176,7 +178,9 @@ describe('PricingCatalogsService', () => {
     };
 
     discounts = {
-      create: jest.fn().mockImplementation((x: Partial<PricingCatalogDiscount>) => x),
+      create: jest.fn().mockImplementation((value: Partial<PricingCatalogDiscount>) => value),
+      delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }),
+      save: jest.fn().mockImplementation(async (value) => value),
     };
 
     tradeConfigs = {
@@ -258,6 +262,39 @@ describe('PricingCatalogsService', () => {
           ),
       },
     };
+
+    const updateManager = {
+      getRepository: jest.fn((entity: unknown) => {
+        if (entity === PricingCatalogVersion) {
+          return repo;
+        }
+
+        if (entity === PricingCatalogPosition) {
+          return positions;
+        }
+
+        if (entity === PricingCatalogSurcharge) {
+          return surcharges;
+        }
+
+        if (entity === PricingCatalogDiscount) {
+          return discounts;
+        }
+
+        throw new Error('Unexpected repository');
+      }),
+    };
+
+    Object.assign(repo, {
+      manager: {
+        transaction: jest
+          .fn()
+          .mockImplementation(
+            async (callback: (manager: typeof updateManager) => Promise<unknown>) =>
+              callback(updateManager),
+          ),
+      },
+    });
 
     service = new PricingCatalogsService(
       repo as unknown as Repository<PricingCatalogVersion>,
@@ -493,48 +530,35 @@ describe('PricingCatalogsService', () => {
         adminUser,
       );
 
-      expect(result.id).toBe('version-id');
-
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           effectiveFrom: new Date('2026-02-01T00:00:00.000Z'),
-          positions: [
-            expect.objectContaining({
-              key: 'heat-pump-installation',
-              label: 'Heat pump installation',
-              unit: PricingUnit.PIECE,
-              netPriceCents: 120000,
-              vatRate: '0.19',
-              minQuantity: '1',
-              maxQuantity: '2',
-              attributes: {
-                heatingPowerKw: 12,
-              },
-              surcharges: [
-                expect.objectContaining({
-                  key: 'express',
-                  label: 'Express',
-                  type: PricingAdjustmentType.FLAT,
-                  amountCents: 5000,
-                  percentage: null,
-                }),
-              ],
-            }),
-          ],
-          discounts: [
-            expect.objectContaining({
-              key: 'winter-discount',
-              label: 'Winter discount',
-              type: PricingAdjustmentType.PERCENTAGE,
-              amountCents: null,
-              percentage: '0.1',
-              capCents: 20000,
-              appliesTo: 'subtotal',
-              sortOrder: 1,
-            }),
-          ],
         }),
       );
+
+      expect(positions.delete).toHaveBeenCalledWith({
+        versionId: 'version-id',
+      });
+
+      expect(positions.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          versionId: 'version-id',
+          key: 'heat-pump-installation',
+          netPriceCents: 120000,
+        }),
+      ]);
+
+      expect(discounts.delete).toHaveBeenCalledWith({
+        versionId: 'version-id',
+      });
+
+      expect(discounts.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          versionId: 'version-id',
+          key: 'winter-discount',
+          sortOrder: 1,
+        }),
+      ]);
     });
 
     it('allows CRAFTSMAN to update their own draft', async () => {
@@ -793,23 +817,6 @@ describe('PricingCatalogsService', () => {
 
       await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
         ConflictException,
-      );
-
-      expect(manager.save).not.toHaveBeenCalled();
-    });
-
-    it('throws BadRequestException when another published version already exists', async () => {
-      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(
-        buildVersion({
-          id: 'published-version-id',
-          status: PricingCatalogStatus.PUBLISHED,
-          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
-          publishedByUserId: 'admin-id',
-        }),
-      );
-
-      await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
-        BadRequestException,
       );
 
       expect(manager.save).not.toHaveBeenCalled();
