@@ -1,0 +1,11 @@
+aws_region  = "eu-central-1"
+project_name = "pricing-catalog"
+environment  = "dev"
+domain_name  = "example.com"
+
+service_image_tags = {
+  auth-service    = "replace-with-git-commit-sha"
+  pricing-service = "replace-with-git-commit-sha"
+  partner-portal  = "replace-with-git-commit-sha"
+  admin-portal    = "replace-with-git-commit-sha"
+}
