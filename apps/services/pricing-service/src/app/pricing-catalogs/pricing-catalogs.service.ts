@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -28,6 +29,8 @@ import { validatePricingAttributes } from './schema/pricing-schema.validator';
 import { calculateQuote } from './quote/quote.calculator';
 import { QuoteResult } from './quote/quote.types';
 import { QuoteRequestDto } from './dto/quote-request.dto';
+import { QuoteIdempotencyRecord } from './entities/quote-idempotency-record.entity';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class PricingCatalogsService {
@@ -46,6 +49,8 @@ export class PricingCatalogsService {
     private readonly discounts: Repository<PricingCatalogDiscount>,
     @InjectRepository(TradeConfig)
     private readonly tradeConfigs: Repository<TradeConfig>,
+    @InjectRepository(QuoteIdempotencyRecord)
+    private readonly idempotencyRecords: Repository<QuoteIdempotencyRecord>,
   ) {}
 
   async list(
@@ -96,9 +101,18 @@ export class PricingCatalogsService {
     versionId: string,
     dto: QuoteRequestDto,
     user: JwtPayload,
+    idempotencyKey?: string,
   ): Promise<QuoteResult> {
-    const version = await this.findVersionEntityOrFail(versionId, user);
-    return calculateQuote(version, dto);
+    return this.executeIdempotentQuote(
+      user.sub,
+      idempotencyKey,
+      `version:${versionId}`,
+      dto,
+      async () => {
+        const version = await this.findVersionEntityOrFail(versionId, user);
+        return calculateQuote(version, dto);
+      },
+    );
   }
 
   async create(dto: CreatePricingCatalogDto, user: JwtPayload): Promise<PricingCatalogResponseDto> {
@@ -205,7 +219,7 @@ export class PricingCatalogsService {
     const saved = await this.versions.save(existing);
     return PricingCatalogResponseDto.from(saved);
   }
-
+  // TODO advisory lock (pg_advisory_lock)
   async publish(versionId: string, user: JwtPayload): Promise<PricingCatalogResponseDto> {
     const published = await this.versions.manager.transaction(async (manager) => {
       const version = await manager.findOne(PricingCatalogVersion, {
@@ -255,13 +269,22 @@ export class PricingCatalogsService {
     trade: string,
     dto: QuoteRequestDto,
     user: JwtPayload,
+    idempotencyKey?: string,
   ): Promise<QuoteResult> {
-    this.assertCanAccess(id, user);
-    await this.assertCraftsmanIsActive(id);
-    await this.assertCraftsmanIsAssignedToTrade(id, trade);
+    return this.executeIdempotentQuote(
+      user.sub,
+      idempotencyKey,
+      `active:${id}:${trade}`,
+      dto,
+      async () => {
+        this.assertCanAccess(id, user);
+        await this.assertCraftsmanIsActive(id);
+        await this.assertCraftsmanIsAssignedToTrade(id, trade);
 
-    const version = await this.findActivePublishedVersionOrFail(id, trade);
-    return calculateQuote(version, dto);
+        const version = await this.findActivePublishedVersionOrFail(id, trade);
+        return calculateQuote(version, dto);
+      },
+    );
   }
 
   private async assertCraftsmanIsActive(craftsmanId: string): Promise<void> {
@@ -375,6 +398,107 @@ export class PricingCatalogsService {
         });
       }
     });
+  }
+
+  private async executeIdempotentQuote(
+    userId: string,
+    idempotencyKey: string | undefined,
+    scope: string,
+    dto: QuoteRequestDto,
+    calculate: () => Promise<QuoteResult>,
+  ): Promise<QuoteResult> {
+    if (idempotencyKey === undefined) {
+      return calculate();
+    }
+
+    if (idempotencyKey.trim().length === 0) {
+      throw new BadRequestException('Idempotency-Key must not be empty');
+    }
+
+    if (idempotencyKey.length > 255) {
+      throw new BadRequestException('Idempotency-Key must not exceed 255 characters');
+    }
+
+    const requestHash = createHash('sha256')
+      .update(
+        JSON.stringify(
+          this.canonicalize({
+            scope,
+            body: dto,
+          }),
+        ),
+      )
+      .digest('hex');
+
+    return this.idempotencyRecords.manager.transaction(async (manager) => {
+      const records = manager.getRepository(QuoteIdempotencyRecord);
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+      await records
+        .createQueryBuilder()
+        .insert()
+        .into(QuoteIdempotencyRecord)
+        .values({
+          userId,
+          idempotencyKey,
+          requestHash,
+          responseBody: null,
+          expiresAt,
+        })
+        .orIgnore()
+        .execute();
+
+      const record = await records
+        .createQueryBuilder('record')
+        .setLock('pessimistic_write')
+        .where('record.userId = :userId', { userId })
+        .andWhere('record.idempotencyKey = :idempotencyKey', {
+          idempotencyKey,
+        })
+        .getOneOrFail();
+
+      const isExpired = record.expiresAt.getTime() <= now.getTime();
+
+      if (!isExpired && record.requestHash !== requestHash) {
+        throw new ConflictException('Idempotency-Key was already used with a different request');
+      }
+
+      if (!isExpired && record.responseBody !== null) {
+        return JSON.parse(record.responseBody) as QuoteResult;
+      }
+
+      if (isExpired) {
+        record.requestHash = requestHash;
+        record.responseBody = null;
+        record.expiresAt = expiresAt;
+      }
+
+      const result = await calculate();
+      record.responseBody = JSON.stringify(result);
+      await records.save(record);
+
+      return result;
+    });
+  }
+
+  private canonicalize(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.canonicalize(item));
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const object = value as Record<string, unknown>;
+
+      return Object.fromEntries(
+        Object.keys(object)
+          .filter((key) => object[key] !== undefined)
+          .sort()
+          .map((key) => [key, this.canonicalize(object[key])]),
+      );
+    }
+
+    return value;
   }
 
   private isCraftsmanOnly(user: JwtPayload): boolean {

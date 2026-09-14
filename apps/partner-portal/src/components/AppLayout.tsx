@@ -1,4 +1,14 @@
-import { AppBar, Box, Button, MenuItem, Select, SelectChangeEvent, Stack, Toolbar, Typography, } from '@mui/material';
+import {
+  AppBar,
+  Box,
+  Button,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Stack,
+  Toolbar,
+  Typography,
+} from '@mui/material';
 import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useLocation } from 'react-router-dom';

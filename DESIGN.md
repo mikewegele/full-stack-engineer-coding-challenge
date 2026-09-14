@@ -23,6 +23,7 @@ Implemented:
 - published catalog display in the partner portal
 - quote preview for published partner catalogs
 - local reset script for pricing catalog test data
+- optional 24-hour idempotency for both quote endpoints
 
 ## Data Model
 
@@ -74,6 +75,16 @@ This order keeps line-level adjustments local to the line and catalog-level disc
 The partner portal currently exposes quote preview for published catalogs using position and quantity. Attribute-based
 quote requests were intentionally not added because the backend quote DTO accepts position keys, quantities, and
 optional surcharge keys, but not arbitrary attributes.
+
+## Quote Idempotency
+
+Both quote endpoints accept an optional `Idempotency-Key` header. Records are scoped by user and key and expire after
+24 hours. A SHA-256 hash covers the canonical request body and quote target, preventing reuse of a key for another
+catalog or request.
+
+The serialized response is stored as text. Repeating the same request returns the cached response byte-identically;
+reusing the key with a different request returns `409 Conflict`. Requests without a key bypass persistence. A unique
+database constraint and pessimistic row lock coordinate concurrent requests using the same key.
 
 ## Trade-Specific Pricing Schema
 
@@ -175,7 +186,6 @@ The following parts were intentionally left out or simplified:
 - time-travel quote lookup by arbitrary timestamp
 - multiple published versions with validity intervals
 - automatic replacement of an existing published catalog when publishing a new draft
-- idempotency keys for quote endpoints
 - Terraform / AWS deployment
 - advanced migration tooling for already existing position attributes
 - attribute-based quote requests
@@ -196,6 +206,7 @@ Implemented tests cover:
 - access control checks
 - admin schema editor data-processing helpers
 - partner pricing catalog table mapping helpers
+- quote idempotency: cached replay, conflicting request, and expired-key reuse
 
 Current verification commands:
 
@@ -217,6 +228,8 @@ The main browser flow was verified manually:
 6. The published catalog updates without requiring a refresh.
 7. Partner calculates a quote preview.
 8. Quote totals are displayed without `NaN` values.
+9. Both quote endpoints return byte-identical responses for repeated requests with the same idempotency key.
+10. Reusing a key with a different request returns `409 Conflict`.
 
 ## Run Notes
 
@@ -237,6 +250,18 @@ OpenAPI types can be regenerated from the running pricing service:
 ```bash
 yarn workspace @sandbox/admin-portal generate:pricing-api
 yarn workspace @sandbox/partner-portal generate:pricing-api
+```
+
+Run database migrations:
+
+```bash
+yarn workspace @sandbox/pricing-service migration:run
+```
+
+Type-check the pricing service:
+
+```bash
+yarn workspace @sandbox/pricing-service tsc --noEmit -p tsconfig.json
 ```
 
 ## AI Usage
@@ -261,6 +286,7 @@ AI-assisted parts:
 - refactoring frontend components into smaller files
 - admin-portal and partner-portal i18n keys and validation messages
 - documentation wording
+- designing and implementing quote idempotency, including persistence, request hashing, locking, and tests
 
 Validation and review:
 
@@ -272,3 +298,6 @@ Validation and review:
 - manually tested the admin schema editor in the browser
 - manually tested the partner draft, publish, and quote-preview flow in the browser
 - verified persisted `pricingSchema` and pricing catalog values through the database/API
+- ran all 88 pricing-service tests and the TypeScript compiler
+- executed the idempotency migration against PostgreSQL
+- verified cached replay and conflict handling through both quote endpoints
