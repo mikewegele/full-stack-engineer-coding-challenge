@@ -216,7 +216,7 @@ export class PricingCatalogsService {
     const saved = await this.versions.save(existing);
     return PricingCatalogResponseDto.from(saved);
   }
-  // TODO advisory lock (pg_advisory_lock)
+
   async publish(versionId: string, user: JwtPayload): Promise<PricingCatalogResponseDto> {
     const published = await this.versions.manager.transaction(async (manager) => {
       const version = await manager.findOne(PricingCatalogVersion, {
@@ -248,17 +248,18 @@ export class PricingCatalogsService {
         );
       }
 
-      const existingPublished = await manager.findOne(PricingCatalogVersion, {
+      const versionWithSameEffectiveFrom = await manager.findOne(PricingCatalogVersion, {
         where: {
           craftsmanId: version.craftsmanId,
           trade: version.trade,
           status: PricingCatalogStatus.PUBLISHED,
+          effectiveFrom: version.effectiveFrom,
         },
       });
 
-      if (existingPublished) {
-        throw new BadRequestException(
-          `A published pricing catalog already exists for craftsman ${version.craftsmanId} and trade ${version.trade}`,
+      if (versionWithSameEffectiveFrom) {
+        throw new ConflictException(
+          `A published pricing catalog with effectiveFrom ${version.effectiveFrom.toISOString()} already exists for craftsman ${version.craftsmanId} and trade ${version.trade}`,
         );
       }
 
@@ -280,21 +281,53 @@ export class PricingCatalogsService {
     dto: QuoteRequestDto,
     user: JwtPayload,
     idempotencyKey?: string,
+    at?: string,
   ): Promise<QuoteResult> {
+    const quoteAt = this.resolveQuoteAt(at);
+    const timeScope = at === undefined || at === 'now' ? 'now' : quoteAt.toISOString();
+
     return this.executeIdempotentQuote(
       user.sub,
       idempotencyKey,
-      `active:${id}:${trade}`,
+      `active:${id}:${trade}:at:${timeScope}`,
       dto,
       async () => {
         this.assertCanAccess(id, user);
-        await this.assertCraftsmanIsActive(id);
+        await this.assertCraftsmanCanBeQuoted(id);
         await this.assertCraftsmanIsAssignedToTrade(id, trade);
 
-        const version = await this.findActivePublishedVersionOrFail(id, trade);
+        const version = await this.findPublishedVersionAtOrFail(id, trade, quoteAt);
         return calculateQuote(version, dto);
       },
     );
+  }
+
+  private resolveQuoteAt(at?: string): Date {
+    if (at === undefined || at === 'now') {
+      return new Date();
+    }
+
+    const parsed = new Date(at);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('at must be a valid ISO timestamp or "now"');
+    }
+
+    return parsed;
+  }
+
+  private async assertCraftsmanCanBeQuoted(craftsmanId: string): Promise<void> {
+    const craftsman = await this.craftsmen.findOne({
+      where: { id: craftsmanId },
+    });
+
+    if (!craftsman) {
+      throw new NotFoundException(`Craftsman ${craftsmanId} not found`);
+    }
+
+    if (!craftsman.isActive) {
+      throw new ForbiddenException(`Craftsman ${craftsmanId} is inactive`);
+    }
   }
 
   private async assertCraftsmanIsActive(craftsmanId: string): Promise<void> {
@@ -342,19 +375,32 @@ export class PricingCatalogsService {
     return version;
   }
 
-  private async findActivePublishedVersionOrFail(
+  private async findPublishedVersionAtOrFail(
     craftsmanId: string,
     trade: string,
+    at: Date,
   ): Promise<PricingCatalogVersion> {
-    const version = await this.findVersionWithRelations({
-      craftsmanId,
-      trade,
-      status: PricingCatalogStatus.PUBLISHED,
-    });
+    const version = await this.versions
+      .createQueryBuilder('version')
+      .leftJoinAndSelect('version.positions', 'position')
+      .leftJoinAndSelect('position.surcharges', 'surcharge')
+      .leftJoinAndSelect('version.discounts', 'discount')
+      .where('version.craftsmanId = :craftsmanId', { craftsmanId })
+      .andWhere('version.trade = :trade', { trade })
+      .andWhere('version.status = :status', {
+        status: PricingCatalogStatus.PUBLISHED,
+      })
+      .andWhere('version.effectiveFrom <= :at', { at })
+      .andWhere('version.publishedAt <= :at', { at })
+      .orderBy('version.effectiveFrom', 'DESC')
+      .addOrderBy('version.publishedAt', 'DESC')
+      .addOrderBy('position.key', 'ASC')
+      .addOrderBy('discount.sortOrder', 'ASC')
+      .getOne();
 
     if (!version) {
       throw new NotFoundException(
-        `Active published pricing catalog for craftsman ${craftsmanId} and trade ${trade} not found`,
+        `Published pricing catalog for craftsman ${craftsmanId} and trade ${trade} at ${at.toISOString()} not found`,
       );
     }
 

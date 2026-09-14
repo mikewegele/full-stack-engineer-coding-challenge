@@ -36,8 +36,31 @@ Positions use stable string keys and store trade-specific attributes as JSONB. T
 the trade's `pricingSchema`, which is stored on `TradeConfig`. This keeps the relational catalog model stable while
 allowing each trade to define different pricing inputs.
 
-The current implementation allows only one published catalog per `(craftsmanId, trade)`. This keeps active lookup
-deterministic and avoids overlapping active intervals. Historical interval-based version lookup was left out.
+## Time-Travel Quotes
+
+Published catalog versions form an append-only timeline per
+`(craftsmanId, trade)`. Multiple versions may be published, but two
+published versions may not have the same `effectiveFrom` timestamp.
+
+For a requested point in time, the service selects the published version
+with the latest `effectiveFrom` satisfying both:
+
+- `effectiveFrom <= at`
+- `publishedAt <= at`
+
+Ordering by `effectiveFrom` descending creates implicit validity intervals:
+a version remains active until the next effective version begins. Including
+`publishedAt` prevents a catalog published later with a historical
+`effectiveFrom` from changing quotes for a time when that catalog was not
+yet known.
+
+Published catalog contents remain immutable, so recalculating a historical
+quote uses the same positions, prices, surcharges, discounts, VAT rates and
+rounding rules as the original calculation.
+
+Concurrent publication is serialized by locking the shared
+`CraftsmanTradeAssignment` row. This prevents two drafts with the same
+effective timestamp from being published concurrently.
 
 ## Money Representation
 

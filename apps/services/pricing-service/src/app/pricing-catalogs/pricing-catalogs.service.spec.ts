@@ -137,10 +137,12 @@ describe('PricingCatalogsService', () => {
   beforeEach(() => {
     qb = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([buildVersion()]),
+      getOne: jest.fn(),
     };
 
     repo = {
@@ -776,7 +778,7 @@ describe('PricingCatalogsService', () => {
       expect(manager.save).not.toHaveBeenCalled();
     });
 
-    it('throws BadRequestException when version is already published', async () => {
+    it('throws ConflictException when the effective date is already published', async () => {
       manager.findOne
         .mockResolvedValueOnce(buildVersion())
         .mockResolvedValueOnce(buildAssignment())
@@ -790,7 +792,7 @@ describe('PricingCatalogsService', () => {
         );
 
       await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
-        BadRequestException,
+        ConflictException,
       );
 
       expect(manager.save).not.toHaveBeenCalled();
@@ -923,7 +925,7 @@ describe('PricingCatalogsService', () => {
 
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
-      expect(rejected[0].reason).toBeInstanceOf(BadRequestException);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
       expect(assignmentLockModes).toEqual(['pessimistic_write', 'pessimistic_write']);
     });
   });
@@ -1051,7 +1053,7 @@ describe('PricingCatalogsService', () => {
       } as PricingCatalogPosition;
       version.positions = [position];
 
-      repo.findOne!.mockResolvedValue(version);
+      qb.getOne.mockResolvedValue(version);
       const result = await service.quoteActiveVersion(
         'craftsman-a',
         'HVAC',
@@ -1112,7 +1114,7 @@ describe('PricingCatalogsService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('throws BadRequestException when craftsman is inactive', async () => {
+    it('throws ForbiddenException when craftsman is inactive', async () => {
       craftsmen.findOne!.mockResolvedValue(buildCraftsman({ isActive: false }));
 
       await expect(
@@ -1129,7 +1131,7 @@ describe('PricingCatalogsService', () => {
           },
           adminUser,
         ),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('throws BadRequestException when craftsman is not assigned to the trade', async () => {
@@ -1156,8 +1158,7 @@ describe('PricingCatalogsService', () => {
     it('throws NotFoundException when no active published catalog exists', async () => {
       craftsmen.findOne!.mockResolvedValue(buildCraftsman());
       assignments.findOne!.mockResolvedValue(buildAssignment());
-      repo.findOne!.mockResolvedValue(null);
-
+      qb.getOne.mockResolvedValue(null);
       await expect(
         service.quoteActiveVersion(
           'craftsman-a',

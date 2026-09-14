@@ -25,6 +25,7 @@ import { CraftsmanResponseDto } from './dto/craftsman-response.dto';
 import { QuoteRequestDto } from '../pricing-catalogs/dto/quote-request.dto';
 import { QuoteResult } from '../pricing-catalogs/quote/quote.types';
 import { PricingCatalogsService } from '../pricing-catalogs/pricing-catalogs.service';
+import { QuoteAtQueryDto } from '../pricing-catalogs/dto/quote-at-query.dto';
 
 @ApiTags('Craftsmen')
 @ApiBearerAuth()
@@ -120,10 +121,18 @@ export class CraftsmenController {
   quoteActiveCatalog(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('trade') trade: string,
+    @Query() query: QuoteAtQueryDto,
     @Body() dto: QuoteRequestDto,
     @CurrentUser() user: JwtPayload,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<QuoteResult> {
-    return this.pricingCatalogsService.quoteActiveVersion(id, trade, dto, user, idempotencyKey);
+    return this.pricingCatalogsService.quoteActiveVersion(
+      id,
+      trade,
+      dto,
+      user,
+      idempotencyKey,
+      query.at,
+    );
   }
 }
