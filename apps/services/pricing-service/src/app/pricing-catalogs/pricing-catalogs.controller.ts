@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -9,7 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '@sandbox/auth';
 import { JwtPayload, UserRole } from '@sandbox/types';
 
@@ -84,18 +87,37 @@ export class PricingCatalogsController {
   }
 
   @Post(':versionId/quote')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
-  @ApiOperation({ summary: 'Calculate a quote for an exact pricing catalog version' })
+  @ApiOperation({
+    summary: 'Calculate a quote for an exact pricing catalog version',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Caches an identical quote request for 24 hours',
+  })
   @ApiResponse({ status: 200, description: 'Calculated quote breakdown' })
   @ApiResponse({ status: 400, description: 'Quote request is invalid' })
-  @ApiResponse({ status: 403, description: 'Caller may not quote this pricing catalog' })
-  @ApiResponse({ status: 404, description: 'Pricing catalog version not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Idempotency key was used with a different request',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller may not quote this pricing catalog',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Pricing catalog version not found',
+  })
   createQuote(
     @Param('versionId', ParseUUIDPipe) versionId: string,
     @Body() dto: QuoteRequestDto,
     @CurrentUser() user: JwtPayload,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<QuoteResult> {
-    return this.service.quoteVersion(versionId, dto, user);
+    return this.service.quoteVersion(versionId, dto, user, idempotencyKey);
   }
 
   @Post(':versionId/publish')

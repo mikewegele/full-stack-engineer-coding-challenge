@@ -10,6 +10,7 @@ import { PricingCatalogsService } from './pricing-catalogs.service';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { TradeConfig } from '../trades/entities/trade-config.entity';
+import { QuoteIdempotencyRecord } from './entities/quote-idempotency-record.entity';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TradeConfig } from '../trades/entities/trade-config.entity';
       Craftsman,
       CraftsmanTradeAssignment,
       TradeConfig,
+      QuoteIdempotencyRecord,
     ]),
   ],
   controllers: [PricingCatalogsController],

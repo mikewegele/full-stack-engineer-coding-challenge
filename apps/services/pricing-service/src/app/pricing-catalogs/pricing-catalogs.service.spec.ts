@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtPayload, UserRole } from '@sandbox/types';
 import { ObjectLiteral, Repository } from 'typeorm';
 
@@ -16,6 +21,7 @@ import { PricingCatalogPosition } from './entities/pricing-catalog-position.enti
 import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
 import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
 import { TradeConfig } from '../trades/entities/trade-config.entity';
+import { QuoteIdempotencyRecord } from './entities/quote-idempotency-record.entity';
 
 type Repo<T extends ObjectLiteral> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -37,6 +43,14 @@ const otherCraftsmanUser: JwtPayload = {
   ...craftsmanUser,
   craftsmanId: 'craftsman-b',
 };
+
+let idempotencyRecords: {
+  manager: {
+    transaction: jest.Mock;
+  };
+};
+
+let storedIdempotencyRecord: QuoteIdempotencyRecord | null;
 
 function buildVersion(overrides: Partial<PricingCatalogVersion> = {}): PricingCatalogVersion {
   const now = new Date('2026-01-01T00:00:00.000Z');
@@ -181,6 +195,68 @@ describe('PricingCatalogsService', () => {
       ),
     };
 
+    storedIdempotencyRecord = null;
+    let insertedValues: Partial<QuoteIdempotencyRecord> = {};
+    let queryBuilderCall = 0;
+
+    const insertBuilder = {
+      insert: jest.fn().mockReturnThis(),
+      into: jest.fn().mockReturnThis(),
+      values: jest.fn().mockImplementation((values: Partial<QuoteIdempotencyRecord>) => {
+        insertedValues = values;
+        return insertBuilder;
+      }),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockImplementation(async () => {
+        if (storedIdempotencyRecord === null) {
+          storedIdempotencyRecord = {
+            id: 'idempotency-record-id',
+            ...insertedValues,
+            createdAt: new Date(),
+          } as QuoteIdempotencyRecord;
+        }
+
+        return {};
+      }),
+    };
+
+    const selectBuilder = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOneOrFail: jest.fn().mockImplementation(async () => {
+        if (storedIdempotencyRecord === null) {
+          throw new Error('Idempotency record not found');
+        }
+
+        return storedIdempotencyRecord;
+      }),
+    };
+
+    const transactionalRepository = {
+      createQueryBuilder: jest.fn().mockImplementation(() => {
+        queryBuilderCall += 1;
+        return queryBuilderCall % 2 === 1 ? insertBuilder : selectBuilder;
+      }),
+      save: jest.fn().mockImplementation(async (record: QuoteIdempotencyRecord) => {
+        storedIdempotencyRecord = record;
+        return record;
+      }),
+    };
+
+    idempotencyRecords = {
+      manager: {
+        transaction: jest
+          .fn()
+          .mockImplementation(
+            async (callback: (manager: { getRepository: jest.Mock }) => Promise<unknown>) =>
+              callback({
+                getRepository: jest.fn().mockReturnValue(transactionalRepository),
+              }),
+          ),
+      },
+    };
+
     service = new PricingCatalogsService(
       repo as unknown as Repository<PricingCatalogVersion>,
       craftsmen as unknown as Repository<Craftsman>,
@@ -189,6 +265,7 @@ describe('PricingCatalogsService', () => {
       surcharges as unknown as Repository<PricingCatalogSurcharge>,
       discounts as unknown as Repository<PricingCatalogDiscount>,
       tradeConfigs as unknown as Repository<TradeConfig>,
+      idempotencyRecords as unknown as Repository<QuoteIdempotencyRecord>,
     );
   });
 
@@ -726,6 +803,104 @@ describe('PricingCatalogsService', () => {
 
       expect(result.status).toBe(PricingCatalogStatus.PUBLISHED);
       expect(manager.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('quote idempotency', () => {
+    const prepareVersion = (): PricingCatalogVersion => {
+      const version = buildVersion({
+        status: PricingCatalogStatus.PUBLISHED,
+      });
+
+      version.positions = [
+        {
+          id: 'position-id',
+          versionId: version.id,
+          version,
+          key: 'install',
+          label: 'Installation',
+          unit: PricingUnit.PIECE,
+          netPriceCents: 10000,
+          vatRate: '0.19',
+          minQuantity: null,
+          maxQuantity: null,
+          attributes: {},
+          surcharges: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as PricingCatalogPosition,
+      ];
+
+      return version;
+    };
+
+    it('returns the cached response for the same key and request', async () => {
+      repo.findOne!.mockResolvedValue(prepareVersion());
+
+      const request = {
+        lines: [{ positionKey: 'install', quantity: 1 }],
+      };
+
+      const first = await service.quoteVersion('version-id', request, adminUser, 'same-key');
+
+      const second = await service.quoteVersion('version-id', request, adminUser, 'same-key');
+
+      expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects the same key with a different request', async () => {
+      repo.findOne!.mockResolvedValue(prepareVersion());
+
+      await service.quoteVersion(
+        'version-id',
+        {
+          lines: [{ positionKey: 'install', quantity: 1 }],
+        },
+        adminUser,
+        'reused-key',
+      );
+
+      await expect(
+        service.quoteVersion(
+          'version-id',
+          {
+            lines: [{ positionKey: 'install', quantity: 2 }],
+          },
+          adminUser,
+          'reused-key',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('allows a key to be reused after expiration', async () => {
+      repo.findOne!.mockResolvedValue(prepareVersion());
+
+      await service.quoteVersion(
+        'version-id',
+        {
+          lines: [{ positionKey: 'install', quantity: 1 }],
+        },
+        adminUser,
+        'expired-key',
+      );
+
+      if (storedIdempotencyRecord === null) {
+        throw new Error('Expected an idempotency record');
+      }
+
+      storedIdempotencyRecord.expiresAt = new Date(0);
+
+      const result = await service.quoteVersion(
+        'version-id',
+        {
+          lines: [{ positionKey: 'install', quantity: 2 }],
+        },
+        adminUser,
+        'expired-key',
+      );
+
+      expect(result.totals.netCents).toBe(20000);
     });
   });
 

@@ -7,6 +7,7 @@ import { PricingCatalogVersion } from './app/pricing-catalogs/entities/pricing-c
 import { PricingCatalogPosition } from './app/pricing-catalogs/entities/pricing-catalog-position.entity';
 import { PricingCatalogDiscount } from './app/pricing-catalogs/entities/pricing-catalog-discount.entity';
 import { PricingCatalogSurcharge } from './app/pricing-catalogs/entities/pricing-catalog-surcharge.entity';
+import { QuoteIdempotencyRecord } from './app/pricing-catalogs/entities/quote-idempotency-record.entity';
 
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
@@ -24,6 +25,7 @@ export const dataSourceOptions: DataSourceOptions = {
     PricingCatalogPosition,
     PricingCatalogDiscount,
     PricingCatalogSurcharge,
+    QuoteIdempotencyRecord,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   migrationsRun: false,

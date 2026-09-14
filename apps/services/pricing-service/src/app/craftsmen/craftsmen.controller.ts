@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -12,7 +13,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '@sandbox/auth';
 import { JwtPayload, PaginatedResponse, UserRole } from '@sandbox/types';
 
@@ -92,18 +93,37 @@ export class CraftsmenController {
   }
 
   @Post(':id/trades/:trade/quote')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.CRAFTSMAN)
-  @ApiOperation({ summary: 'Calculate a quote for the active published pricing catalog' })
+  @ApiOperation({
+    summary: 'Calculate a quote for the active published pricing catalog',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Caches an identical quote request for 24 hours',
+  })
   @ApiResponse({ status: 200, description: 'Calculated quote breakdown' })
   @ApiResponse({ status: 400, description: 'Quote request is invalid' })
-  @ApiResponse({ status: 403, description: 'Caller may not quote this craftsman' })
-  @ApiResponse({ status: 404, description: 'Active published pricing catalog not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Idempotency key was used with a different request',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller may not quote this craftsman',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Active published pricing catalog not found',
+  })
   quoteActiveCatalog(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('trade') trade: string,
     @Body() dto: QuoteRequestDto,
     @CurrentUser() user: JwtPayload,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<QuoteResult> {
-    return this.pricingCatalogsService.quoteActiveVersion(id, trade, dto, user);
+    return this.pricingCatalogsService.quoteActiveVersion(id, trade, dto, user, idempotencyKey);
   }
 }
