@@ -724,7 +724,10 @@ describe('PricingCatalogsService', () => {
     });
 
     it('publishes a draft pricing catalog', async () => {
-      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(null);
+      manager.findOne
+        .mockResolvedValueOnce(buildVersion())
+        .mockResolvedValueOnce(buildAssignment())
+        .mockResolvedValueOnce(null);
 
       const result = await service.publish('version-id', adminUser);
 
@@ -738,6 +741,16 @@ describe('PricingCatalogsService', () => {
           publishedByUserId: 'admin-id',
         }),
       );
+
+      expect(manager.findOne).toHaveBeenNthCalledWith(2, CraftsmanTradeAssignment, {
+        where: {
+          craftsmanId: 'craftsman-a',
+          trade: 'HVAC',
+        },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
 
       const savedVersion = manager.save.mock.calls[0][1] as PricingCatalogVersion;
       expect(savedVersion.publishedAt).toBeInstanceOf(Date);
@@ -764,13 +777,17 @@ describe('PricingCatalogsService', () => {
     });
 
     it('throws BadRequestException when version is already published', async () => {
-      manager.findOne.mockResolvedValueOnce(
-        buildVersion({
-          status: PricingCatalogStatus.PUBLISHED,
-          publishedAt: new Date('2026-01-01T00:00:00.000Z'),
-          publishedByUserId: 'admin-id',
-        }),
-      );
+      manager.findOne
+        .mockResolvedValueOnce(buildVersion())
+        .mockResolvedValueOnce(buildAssignment())
+        .mockResolvedValueOnce(
+          buildVersion({
+            id: 'published-version-id',
+            status: PricingCatalogStatus.PUBLISHED,
+            publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+            publishedByUserId: 'admin-id',
+          }),
+        );
 
       await expect(service.publish('version-id', adminUser)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -797,12 +814,117 @@ describe('PricingCatalogsService', () => {
     });
 
     it('allows CRAFTSMAN to publish their own draft', async () => {
-      manager.findOne.mockResolvedValueOnce(buildVersion()).mockResolvedValueOnce(null);
+      manager.findOne
+        .mockResolvedValueOnce(buildVersion())
+        .mockResolvedValueOnce(buildAssignment())
+        .mockResolvedValueOnce(null);
 
       const result = await service.publish('version-id', craftsmanUser);
 
       expect(result.status).toBe(PricingCatalogStatus.PUBLISHED);
       expect(manager.save).toHaveBeenCalled();
+    });
+
+    it('allows exactly one of two concurrent draft publishes', async () => {
+      const drafts = new Map<string, PricingCatalogVersion>([
+        ['draft-a', buildVersion({ id: 'draft-a' })],
+        ['draft-b', buildVersion({ id: 'draft-b' })],
+      ]);
+
+      let publishedVersion: PricingCatalogVersion | null = null;
+      let lockTail = Promise.resolve();
+      const assignmentLockModes: Array<string | undefined> = [];
+
+      const transaction = jest
+        .fn()
+        .mockImplementation(
+          async (
+            callback: (transactionManager: {
+              findOne: jest.Mock;
+              save: jest.Mock;
+            }) => Promise<PricingCatalogVersion>,
+          ) => {
+            const waitForPreviousLock = lockTail;
+            let releaseLock!: () => void;
+
+            lockTail = new Promise<void>((resolve) => {
+              releaseLock = resolve;
+            });
+
+            let assignmentLockAcquired = false;
+
+            const transactionManager = {
+              findOne: jest.fn().mockImplementation(
+                async (
+                  entity: unknown,
+                  options: {
+                    where: Record<string, unknown>;
+                    lock?: { mode: string };
+                  },
+                ) => {
+                  if (entity === CraftsmanTradeAssignment) {
+                    assignmentLockModes.push(options.lock?.mode);
+                    await waitForPreviousLock;
+                    assignmentLockAcquired = true;
+                    return buildAssignment();
+                  }
+
+                  if (entity === PricingCatalogVersion && typeof options.where.id === 'string') {
+                    return drafts.get(options.where.id) ?? null;
+                  }
+
+                  if (
+                    entity === PricingCatalogVersion &&
+                    options.where.status === PricingCatalogStatus.PUBLISHED
+                  ) {
+                    return publishedVersion;
+                  }
+
+                  return null;
+                },
+              ),
+              save: jest
+                .fn()
+                .mockImplementation(
+                  async (_entity: typeof PricingCatalogVersion, version: PricingCatalogVersion) => {
+                    publishedVersion = { ...version };
+                    return publishedVersion;
+                  },
+                ),
+            };
+
+            try {
+              return await callback(transactionManager);
+            } finally {
+              if (assignmentLockAcquired) {
+                releaseLock();
+              }
+            }
+          },
+        );
+
+      Object.assign(repo, {
+        manager: {
+          transaction,
+        },
+      });
+
+      repo.findOne!.mockImplementation(async () => publishedVersion);
+
+      const results = await Promise.allSettled([
+        service.publish('draft-a', adminUser),
+        service.publish('draft-b', adminUser),
+      ]);
+
+      const fulfilled = results.filter((result) => result.status === 'fulfilled');
+      const rejected = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(BadRequestException);
+      expect(assignmentLockModes).toEqual(['pessimistic_write', 'pessimistic_write']);
     });
   });
 

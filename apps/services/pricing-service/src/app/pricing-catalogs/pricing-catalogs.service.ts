@@ -16,10 +16,7 @@ import { CreatePricingCatalogDto } from './dto/create-pricing-catalog.dto';
 import { Craftsman } from '../craftsmen/entities/craftsman.entity';
 import { CraftsmanTradeAssignment } from '../craftsmen/entities/craftsman-trade-assignment.entity';
 import { PricingCatalogStatus } from './entities/pricing-catalog.enums';
-import {
-  UpdatePricingCatalogDto,
-  UpdatePricingCatalogPositionDto,
-} from './dto/update-pricing-catalog.dto';
+import { UpdatePricingCatalogDto, UpdatePricingCatalogPositionDto, } from './dto/update-pricing-catalog.dto';
 import { PricingCatalogPosition } from './entities/pricing-catalog-position.entity';
 import { PricingCatalogSurcharge } from './entities/pricing-catalog-surcharge.entity';
 import { PricingCatalogDiscount } from './entities/pricing-catalog-discount.entity';
@@ -237,13 +234,26 @@ export class PricingCatalogsService {
         throw new BadRequestException('Only draft pricing catalogs can be published');
       }
 
+      const assignment = await manager.findOne(CraftsmanTradeAssignment, {
+        where: {
+          craftsmanId: version.craftsmanId,
+          trade: version.trade,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!assignment || !assignment.isActive) {
+        throw new BadRequestException(
+          `Craftsman ${version.craftsmanId} is not actively assigned to trade ${version.trade}`,
+        );
+      }
+
       const existingPublished = await manager.findOne(PricingCatalogVersion, {
         where: {
           craftsmanId: version.craftsmanId,
           trade: version.trade,
           status: PricingCatalogStatus.PUBLISHED,
         },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (existingPublished) {
